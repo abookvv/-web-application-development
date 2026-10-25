@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Карточка заявки — Экспедитор</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+</head>
+<body data-page="order" data-roles="logist,manager">
+  <header id="app-header"></header>
+
+  <main class="page">
+    <nav id="crumbs"></nav>
+    <div class="page-head">
+      <h1 id="order-title">Заявка</h1>
+    </div>
+
+    <!-- Делает Таисия (вёрстка) и Анна (логика в js/order-logic.js). Figma: колонка 3.
+         Номер заявки берётся из адреса страницы: order.html?id=1024 -->
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <!-- <script src="js/order-logic.js"></script>  подключить, когда Анна пришлёт файл -->
+  <script>
+    var id = Number(new URLSearchParams(location.search).get('id'));
+    var order = Exp.load('orders').find(function (o) { return o.id === id; });
+    if (order) {
+      var route = order.from + ' → ' + order.to;
+      Exp.crumbs([['Заявки', 'orders.html'], [route]]);
+      document.getElementById('order-title').textContent = route;
+      document.title = route + ' — Экспедитор';
+    } else {
+      Exp.crumbs([['Заявки', 'orders.html'], ['Заявка не найдена']]);
+      document.getElementById('order-title').textContent = 'Заявка не найдена';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вход — Экспедитор</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+</head>
+<body data-page="login">
+  <main class="page" style="max-width: 400px; margin-top: 80px;">
+    <h1>Вход</h1>
+
+    <!-- Делает Эмиль. Figma: колонка 1.
+         Сейчас здесь простейшая форма, чтобы остальные могли войти и проверять свои страницы.
+         Эмиль заменяет её на вёрстку из Figma и добавляет ошибки:
+         пустые поля, неверный логин или пароль, блокировка на 5 минут после 5 попыток, учётная запись отключена.
+         Демо-логины: alexey (логист), oleg (руководитель), irina (администратор), пароль 1234. -->
+    <form id="login-form" class="card" style="display: flex; flex-direction: column; gap: 12px;">
+      <label>Логин<br><input name="login" autocomplete="username"></label>
+      <label>Пароль<br><input name="password" type="password" autocomplete="current-password"></label>
+      <p id="login-error" class="muted" role="alert"></p>
+      <button class="btn btn--primary" type="submit">Войти</button>
+    </form>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var login = this.login.value.trim();
+      var user = Exp.findUser(login);
+      if (!user || user.password !== this.password.value) {
+        document.getElementById('login-error').textContent = 'Неверный логин или пароль';
+      } else if (!user.active) {
+        document.getElementById('login-error').textContent = 'Учётная запись отключена. Обратитесь к администратору';
+      } else {
+        Exp.startSession(login);
+      }
+    });
+  </script>
+</body>
+</html>

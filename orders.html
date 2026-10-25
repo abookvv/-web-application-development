@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Заявки — Экспедитор</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+</head>
+<body data-page="orders" data-roles="logist,manager">
+  <header id="app-header"></header>
+
+  <main class="page">
+    <div class="page-head">
+      <h1>Заявки</h1>
+      <button class="btn btn--primary" type="button" id="new-order-btn">+&nbsp;&nbsp;Новая заявка</button>
+    </div>
+
+    <!-- Делает Эмиль. Figma: колонка 2.
+         Вкладки со счётчиками, поиск по маршруту, фильтр, таблица, пустые состояния.
+         Кнопка «+ Новая заявка» открывает модалку Анны из js/new-order.js. -->
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <!-- <script src="js/new-order.js"></script>  подключить, когда Анна пришлёт файл -->
+</body>
+</html>
