@@ -8,23 +8,184 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/common.css">
+  <style>
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+    .tab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--mute); cursor: pointer; }
+    .tab:hover { color: var(--ink); }
+    .tab.is-active { border-bottom-color: var(--dark); color: var(--ink); font-weight: 600; }
+    .tab__count { min-width: 24px; padding: 2px 7px; border-radius: 12px; background: var(--soft); color: var(--ink); font-size: 12px; text-align: center; }
+    .orders-tools { display: flex; gap: 12px; }
+    .search-field { position: relative; flex: 1 1 360px; max-width: 520px; }
+    .search-field svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); pointer-events: none; }
+    .search-field input, .orders-tools select { height: 38px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+    .search-field input { width: 100%; padding: 0 12px 0 38px; }
+    .orders-tools select { min-width: 190px; padding: 0 32px 0 12px; }
+    .search-field input:hover, .orders-tools select:hover { border-color: var(--dark); }
+    .orders-card { padding: 0; overflow: hidden; }
+    .table-scroll { overflow-x: auto; }
+    .orders-table { width: 100%; min-width: 940px; border-collapse: collapse; table-layout: fixed; }
+    .orders-table th { padding: 11px 14px; background: var(--soft); color: var(--mute); font-size: 12px; font-weight: 600; text-align: left; }
+    .orders-table td { padding: 13px 14px; border-top: 1px solid var(--line-2); vertical-align: middle; }
+    .orders-table tbody tr { cursor: pointer; }
+    .orders-table tbody tr:hover { background: #f8f8f8; }
+    .orders-table tbody tr:focus-visible { outline-offset: -2px; }
+    .route { font-weight: 600; }
+    .cell-secondary { display: block; margin-top: 2px; color: var(--mute); font-size: 12px; }
+    .status { display: inline-flex; padding: 4px 8px; border-radius: 12px; background: var(--soft); white-space: nowrap; font-size: 12px; }
+    .empty-state { padding: 64px 24px; text-align: center; }
+    .empty-state h2 { margin-bottom: 6px; }
+    .empty-state p { margin: 0; color: var(--mute); }
+
+    @media (max-width: 720px) {
+      .orders-tools { flex-direction: column; }
+      .search-field { flex-basis: auto; max-width: none; }
+      .orders-tools select, .page-head .btn { width: 100%; }
+    }
+  </style>
 </head>
 <body data-page="orders" data-roles="logist,manager">
   <header id="app-header"></header>
-
   <main class="page">
     <div class="page-head">
       <h1>Заявки</h1>
       <button class="btn btn--primary" type="button" id="new-order-btn">+&nbsp;&nbsp;Новая заявка</button>
     </div>
 
-    <!-- Делает Эмиль. Figma: колонка 2.
-         Вкладки со счётчиками, поиск по маршруту, фильтр, таблица, пустые состояния.
-         Кнопка «+ Новая заявка» открывает модалку Анны из js/new-order.js. -->
+    <div class="tabs" role="tablist" aria-label="Статус заявок">
+      <button class="tab is-active" id="tab-work" type="button" role="tab" aria-selected="true" data-tab="work">Рабочие <span class="tab__count" data-count="work">0</span></button>
+      <button class="tab" id="tab-closed" type="button" role="tab" aria-selected="false" data-tab="closed">Закрытые <span class="tab__count" data-count="closed">0</span></button>
+      <button class="tab" id="tab-lost" type="button" role="tab" aria-selected="false" data-tab="lost">Отменённые и потерянные <span class="tab__count" data-count="lost">0</span></button>
+    </div>
+
+    <div class="orders-tools">
+      <label class="search-field">
+        <span class="visually-hidden">Поиск по маршруту</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.75" stroke="#666" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="#666" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input id="route-search" type="search" placeholder="Поиск по маршруту" autocomplete="off">
+      </label>
+      <label>
+        <span class="visually-hidden">Фильтр по типу кузова</span>
+        <select id="truck-filter"><option value="">Все типы кузова</option></select>
+      </label>
+    </div>
+
+    <section class="card orders-card" id="orders-panel" role="tabpanel" aria-labelledby="tab-work">
+      <div class="table-scroll" id="orders-table-wrap">
+        <table class="orders-table">
+          <thead><tr><th style="width: 8%">№</th><th style="width: 25%">Маршрут</th><th style="width: 17%">Машина</th><th style="width: 14%">Дата загрузки</th><th style="width: 14%">Ставка клиента</th><th style="width: 15%">Статус</th><th style="width: 7%" aria-label="Открыть"></th></tr></thead>
+          <tbody id="orders-body"></tbody>
+        </table>
+      </div>
+      <div class="empty-state" id="empty-state" hidden>
+        <h2 id="empty-title">В этой вкладке пока пусто</h2>
+        <p id="empty-text">Заявки появятся здесь после изменения статуса.</p>
+      </div>
+    </section>
   </main>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
-  <!-- <script src="js/new-order.js"></script>  подключить, когда Анна пришлёт файл -->
+  <script src="js/new-order.js"></script>
+  <script>
+    (function () {
+      var activeTab = 'work';
+      var allOrders = Exp.load('orders');
+      var orders = Exp.user.role === 'manager' ? allOrders : allOrders.filter(function (order) { return order.logist === Exp.user.login; });
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+      var searchInput = document.getElementById('route-search');
+      var truckFilter = document.getElementById('truck-filter');
+      var body = document.getElementById('orders-body');
+      var tableWrap = document.getElementById('orders-table-wrap');
+      var emptyState = document.getElementById('empty-state');
+      var emptyTitle = document.getElementById('empty-title');
+      var emptyText = document.getElementById('empty-text');
+      var panel = document.getElementById('orders-panel');
+
+      DATA.truckTypes.forEach(function (truckType) {
+        var option = document.createElement('option');
+        option.value = truckType;
+        option.textContent = truckType;
+        truckFilter.appendChild(option);
+      });
+
+      function ordersForTab(tabName) {
+        return orders.filter(function (order) { return DATA.tabs[tabName].indexOf(order.status) !== -1; });
+      }
+
+      function updateCounts() {
+        Object.keys(DATA.tabs).forEach(function (tabName) {
+          document.querySelector('[data-count="' + tabName + '"]').textContent = ordersForTab(tabName).length;
+        });
+      }
+
+      function normalized(value) { return value.toLocaleLowerCase('ru-RU').replace(/ё/g, 'е'); }
+
+      function filteredOrders() {
+        var query = normalized(searchInput.value.trim());
+        var truckType = truckFilter.value;
+        return ordersForTab(activeTab).filter(function (order) {
+          var route = normalized(order.from + ' ' + order.to);
+          return (!query || route.indexOf(query) !== -1) && (!truckType || order.truckType === truckType);
+        });
+      }
+
+      function openOrder(id) { location.href = 'order.html?id=' + encodeURIComponent(id); }
+
+      function rowHtml(order) {
+        return '<tr tabindex="0" data-id="' + order.id + '" aria-label="Открыть заявку №' + order.id + '">' +
+          '<td>' + order.id + '</td>' +
+          '<td><span class="route">' + Exp.escapeHtml(order.from) + ' → ' + Exp.escapeHtml(order.to) + '</span><span class="cell-secondary">Создана ' + Exp.date(order.createdAt) + '</span></td>' +
+          '<td>' + Exp.escapeHtml(order.truckType) + '<span class="cell-secondary">' + order.weightT + ' т</span></td>' +
+          '<td>' + Exp.date(order.loadDate) + '</td><td>' + Exp.money(order.clientRate) + '</td>' +
+          '<td><span class="status">' + Exp.escapeHtml(DATA.statuses[order.status]) + '</span></td><td aria-hidden="true">→</td></tr>';
+      }
+
+      function render() {
+        var visibleOrders = filteredOrders();
+        var hasFilters = searchInput.value.trim() || truckFilter.value;
+        body.innerHTML = visibleOrders.map(rowHtml).join('');
+        tableWrap.hidden = visibleOrders.length === 0;
+        emptyState.hidden = visibleOrders.length !== 0;
+
+        if (!visibleOrders.length) {
+          if (!orders.length) {
+            emptyTitle.textContent = 'Заявок ещё нет';
+            emptyText.textContent = 'Создайте первую заявку, чтобы начать работу.';
+          } else if (hasFilters) {
+            emptyTitle.textContent = 'Ничего не найдено';
+            emptyText.textContent = 'Измените запрос или параметры фильтра.';
+          } else {
+            emptyTitle.textContent = 'В этой вкладке пока пусто';
+            emptyText.textContent = 'Заявки появятся здесь после изменения статуса.';
+          }
+        }
+
+        Array.prototype.forEach.call(body.querySelectorAll('tr[data-id]'), function (row) {
+          row.addEventListener('click', function () { openOrder(row.getAttribute('data-id')); });
+          row.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openOrder(row.getAttribute('data-id')); }
+          });
+        });
+      }
+
+      function selectTab(tabName) {
+        activeTab = tabName;
+        tabs.forEach(function (tab) {
+          var selected = tab.getAttribute('data-tab') === activeTab;
+          tab.classList.toggle('is-active', selected);
+          tab.setAttribute('aria-selected', String(selected));
+        });
+        panel.setAttribute('aria-labelledby', 'tab-' + activeTab);
+        render();
+      }
+
+      tabs.forEach(function (tab) { tab.addEventListener('click', function () { selectTab(tab.getAttribute('data-tab')); }); });
+      searchInput.addEventListener('input', render);
+      truckFilter.addEventListener('change', render);
+      updateCounts();
+      render();
+    })();
+  </script>
 </body>
 </html>
