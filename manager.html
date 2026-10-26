@@ -8,21 +8,407 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/common.css">
+  <style>
+    [hidden] { display: none !important; }
+    .mgr-sub { margin: 4px 0 0; color: var(--mute); font-size: 13px; }
+    .mgr-period { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--white); }
+    .mgr-period__btn { height: 34px; padding: 0 18px; border: 0; border-left: 1px solid var(--line); background: var(--white); cursor: pointer; }
+    .mgr-period__btn:first-child { border-left: 0; }
+    .mgr-period__btn:hover { background: var(--soft); }
+    .mgr-period__btn[aria-pressed="true"] { background: var(--dark); color: var(--white); font-weight: 600; }
+    .mgr-period__btn:focus-visible { outline-offset: -2px; }
+
+    .mgr-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .mgr-stat { display: flex; flex-direction: column; gap: 4px; }
+    .mgr-stat__label { color: var(--mute); font-size: 13px; }
+    .mgr-stat__value { font-size: 28px; font-weight: 600; line-height: 1.15; }
+    .mgr-stat__sub { color: var(--mute); font-size: 12px; }
+
+    .mgr-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 8fr); gap: 16px; align-items: start; }
+    .mgr-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; margin-bottom: 8px; }
+    .mgr-head h2 { font-size: 15px; }
+    .mgr-note { color: var(--mute); font-size: 13px; }
+    .mgr-empty { margin: 0; color: var(--mute); }
+
+    .mgr-reasons { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+    .mgr-reason { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 24px; align-items: center; gap: 14px; width: 100%; padding: 8px 8px; border: 1px solid transparent; border-radius: var(--radius); background: transparent; text-align: left; cursor: pointer; }
+    .mgr-reason:hover:not(:disabled) { background: #f8f8f8; border-color: var(--line-2); }
+    .mgr-reason:disabled { color: var(--mute); cursor: default; }
+    .mgr-reason.is-selected { border-color: var(--dark); background: var(--soft); font-weight: 600; }
+    .mgr-reason__count { font-weight: 600; text-align: right; }
+    .mgr-bar { display: block; height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; }
+    .mgr-reason.is-selected .mgr-bar { background: var(--white); }
+    .mgr-bar__fill { display: block; height: 100%; min-width: 2px; border-radius: 4px; background: var(--dark); }
+
+    .mgr-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+    .mgr-table { width: 100%; min-width: 520px; border-collapse: collapse; }
+    .mgr-table th { padding: 10px 14px; background: var(--soft); color: var(--mute); font-size: 12px; font-weight: 600; text-align: left; }
+    .mgr-table td { padding: 12px 14px; border-top: 1px solid var(--line-2); vertical-align: middle; }
+    .mgr-table tbody tr { cursor: pointer; }
+    .mgr-table tbody tr:hover { background: #f8f8f8; }
+    .mgr-table tbody tr:focus-visible { outline-offset: -2px; }
+    .mgr-table .is-num { white-space: nowrap; }
+    .mgr-link { padding: 0; border: 0; background: none; font-weight: 600; text-decoration: underline; cursor: pointer; }
+
+    .mgr-overlay { position: fixed; inset: 0; z-index: 30; display: flex; justify-content: flex-end; background: rgba(30, 30, 30, .45); }
+    .mgr-panel { display: flex; flex-direction: column; gap: 14px; width: min(480px, 100%); height: 100%; padding: 24px; overflow-y: auto; background: var(--white); box-shadow: -4px 0 16px rgba(0, 0, 0, .15); }
+    .mgr-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .mgr-panel__close { width: 36px; height: 36px; border: 0; border-radius: var(--radius); background: none; font-size: 22px; line-height: 1; cursor: pointer; }
+    .mgr-panel__close:hover { background: var(--soft); }
+    .mgr-chip { align-self: flex-start; padding: 4px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); font-size: 12px; }
+    .mgr-log { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+    .mgr-log__item { padding: 12px 0; border-top: 1px solid var(--line-2); }
+    .mgr-log__item:first-child { border-top: 0; }
+    .mgr-log__meta { color: var(--mute); font-size: 12px; }
+    .mgr-log__detail { margin-top: 2px; font-size: 13px; font-weight: 600; }
+    .mgr-panel .btn { align-self: flex-start; }
+
+    @media (max-width: 1000px) {
+      .mgr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .mgr-grid { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .mgr-cards { grid-template-columns: minmax(0, 1fr); }
+      .mgr-period { width: 100%; }
+      .mgr-period__btn { flex: 1 1 0; }
+      .mgr-panel { padding: 16px; }
+    }
+  </style>
 </head>
 <body data-page="manager" data-roles="manager">
   <header id="app-header"></header>
 
   <main class="page">
     <div class="page-head">
-      <h1>Панель отдела</h1>
+      <div>
+        <h1>Панель отдела</h1>
+        <p class="mgr-sub" id="period-sub"></p>
+      </div>
+      <div class="mgr-period" role="group" aria-label="Период">
+        <button class="mgr-period__btn" type="button" data-period="day" aria-pressed="false">День</button>
+        <button class="mgr-period__btn" type="button" data-period="week" aria-pressed="true">Неделя</button>
+        <button class="mgr-period__btn" type="button" data-period="month" aria-pressed="false">Месяц</button>
+      </div>
     </div>
 
-    <!-- Делает Вячеслав. Figma: колонка 5.
-         Период «День / Неделя / Месяц», 4 показателя, потери по причинам,
-         таблица по логистам, журнал действий в боковой панели, пустой период. -->
+    <section class="mgr-cards" aria-label="Показатели отдела">
+      <article class="card mgr-stat">
+        <div class="mgr-stat__label">В работе</div>
+        <div class="mgr-stat__value" id="stat-work">0</div>
+        <div class="mgr-stat__sub" id="sub-work"></div>
+      </article>
+      <article class="card mgr-stat">
+        <div class="mgr-stat__label">Закрыто</div>
+        <div class="mgr-stat__value" id="stat-closed">0</div>
+        <div class="mgr-stat__sub" id="sub-closed"></div>
+      </article>
+      <article class="card mgr-stat">
+        <div class="mgr-stat__label">Потеряно</div>
+        <div class="mgr-stat__value" id="stat-lost">0</div>
+        <div class="mgr-stat__sub" id="sub-lost"></div>
+      </article>
+      <article class="card mgr-stat">
+        <div class="mgr-stat__label">Маржа отдела</div>
+        <div class="mgr-stat__value" id="stat-margin">0 ₽</div>
+        <div class="mgr-stat__sub" id="sub-margin"></div>
+      </article>
+    </section>
+
+    <div class="mgr-grid">
+      <section class="card" aria-labelledby="losses-title">
+        <div class="mgr-head">
+          <h2 id="losses-title">Потери по причинам</h2>
+          <span class="mgr-note" id="losses-total"></span>
+        </div>
+        <div id="losses-body"></div>
+      </section>
+
+      <section class="card" aria-labelledby="side-title">
+        <div class="mgr-head">
+          <h2 id="side-title"></h2>
+          <span class="mgr-note" id="side-note"></span>
+          <button class="btn" type="button" id="reason-reset" hidden>Сбросить&nbsp;&nbsp;×</button>
+        </div>
+        <div id="side-body"></div>
+      </section>
+    </div>
   </main>
+
+  <div class="mgr-overlay" id="journal-overlay" hidden>
+    <aside class="mgr-panel" id="journal-panel" role="dialog" aria-modal="true" aria-labelledby="journal-title">
+      <div class="mgr-panel__head">
+        <h2 id="journal-title">Журнал действий</h2>
+        <button class="mgr-panel__close" type="button" id="journal-close" aria-label="Закрыть журнал">×</button>
+      </div>
+      <div class="mgr-note" id="journal-order"></div>
+      <span class="mgr-chip" id="journal-status"></span>
+      <ol class="mgr-log" id="journal-list"></ol>
+      <a class="btn" id="journal-open" href="order.html">Открыть карточку заявки</a>
+    </aside>
+  </div>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+      var PERIODS = {
+        day: { days: 1, title: 'День', sub: 'за день', empty: 'За выбранный день заявок нет. Выберите «Неделя» или «Месяц».' },
+        week: { days: 7, title: 'Неделя', sub: 'за неделю', empty: 'За выбранную неделю заявок нет. Выберите «День» или «Месяц».' },
+        month: { days: 30, title: 'Месяц', sub: 'за месяц', empty: 'За выбранный месяц заявок нет. Выберите «День» или «Неделя».' }
+      };
+      var esc = Exp.escapeHtml;
+      var state = { period: 'week', reason: null };
+      var lastFocus = null;
+
+      function pad(n) { return (n < 10 ? '0' : '') + n; }
+      function isoDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+      function addDays(iso, n) {
+        var p = iso.split('-');
+        var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+        d.setDate(d.getDate() + n);
+        return isoDate(d);
+      }
+      function parts(iso) { var p = iso.split('-'); return { y: Number(p[0]), m: Number(p[1]) - 1, d: Number(p[2]) }; }
+      function rangeLabel(from, to) {
+        var a = parts(from), b = parts(to);
+        if (from === to) return b.d + ' ' + MONTHS[b.m] + ' ' + b.y;
+        if (a.y === b.y && a.m === b.m) return a.d + '–' + b.d + ' ' + MONTHS[b.m] + ' ' + b.y;
+        if (a.y === b.y) return a.d + ' ' + MONTHS[a.m] + ' – ' + b.d + ' ' + MONTHS[b.m] + ' ' + b.y;
+        return a.d + ' ' + MONTHS[a.m] + ' ' + a.y + ' – ' + b.d + ' ' + MONTHS[b.m] + ' ' + b.y;
+      }
+
+      // Периоды считаем от «сегодня» из data.js (демо-данные статичны); заявки, созданные позже, считаются сегодняшними
+      var TODAY = DATA.today || isoDate(new Date());
+
+      function signedMoney(n) {
+        if (n > 0) return '+' + Exp.money(n);
+        if (n < 0) return '−' + Exp.money(-n);
+        return Exp.money(0);
+      }
+      function plural(n, one, few, many) {
+        var m10 = n % 10, m100 = n % 100;
+        if (m10 === 1 && m100 !== 11) return one;
+        if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+        return many;
+      }
+      function countBy(list, statuses) {
+        return list.filter(function (o) { return statuses.indexOf(o.status) !== -1; }).length;
+      }
+      function marginOf(list) {
+        return list.reduce(function (sum, o) {
+          return o.status === 'closed' && o.carrierRate != null ? sum + (o.clientRate - o.carrierRate) : sum;
+        }, 0);
+      }
+      function userName(login) {
+        if (login === 'system') return 'Система';
+        var user = Exp.findUser(login);
+        return user ? user.name : login;
+      }
+      function ordersOfPeriod(orders, period) {
+        var from = addDays(TODAY, -(PERIODS[period].days - 1));
+        return orders.filter(function (o) {
+          var day = o.createdAt.slice(0, 10);
+          if (day > TODAY) day = TODAY;
+          return day >= from;
+        });
+      }
+
+      function reasonsHtml(counts) {
+        var max = Math.max.apply(null, counts);
+        return '<ul class="mgr-reasons">' + DATA.lossReasons.map(function (reason, i) {
+          var n = counts[i];
+          var selected = state.reason === i;
+          var width = max ? Math.max(Math.round(n / max * 100), n ? 5 : 0) : 0;
+          return '<li><button class="mgr-reason' + (selected ? ' is-selected' : '') + '" type="button" data-reason="' + i + '" aria-pressed="' + selected + '"' + (n ? '' : ' disabled') + '>' +
+            '<span>' + esc(reason) + '</span>' +
+            '<span class="mgr-bar" aria-hidden="true"><span class="mgr-bar__fill" style="width: ' + width + '%"></span></span>' +
+            '<span class="mgr-reason__count">' + n + '</span></button></li>';
+        }).join('') + '</ul>';
+      }
+
+      function logistsHtml(list, users) {
+        var rows = users.filter(function (u) { return u.role === 'logist'; }).map(function (u) {
+          var own = list.filter(function (o) { return o.logist === u.login; });
+          return { user: u, own: own };
+        }).filter(function (r) { return r.user.active || r.own.length; });
+        return '<div class="mgr-table-wrap"><table class="mgr-table"><thead><tr>' +
+          '<th>Логист</th><th>В работе</th><th>Закрыто</th><th>Потеряно</th><th>Маржа</th><th aria-label="Открыть заявки"></th></tr></thead><tbody>' +
+          rows.map(function (r) {
+            return '<tr tabindex="0" data-logist="' + esc(r.user.login) + '" aria-label="Заявки логиста ' + esc(r.user.name) + '">' +
+              '<td>' + esc(r.user.name) + '</td>' +
+              '<td>' + countBy(r.own, DATA.tabs.work) + '</td>' +
+              '<td>' + countBy(r.own, ['closed']) + '</td>' +
+              '<td>' + countBy(r.own, ['lost']) + '</td>' +
+              '<td class="is-num">' + signedMoney(marginOf(r.own)) + '</td>' +
+              '<td aria-hidden="true">›</td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+
+      function lostListHtml(lost, users) {
+        var rows = lost.slice().sort(function (a, b) { return b.id - a.id; });
+        return '<div class="mgr-table-wrap"><table class="mgr-table"><thead><tr>' +
+          '<th>№</th><th>Маршрут</th><th>Логист</th><th>Ставка</th><th aria-label="Журнал"></th></tr></thead><tbody>' +
+          rows.map(function (o) {
+            return '<tr tabindex="0" data-id="' + o.id + '" aria-label="Открыть заявку №' + o.id + '">' +
+              '<td>' + o.id + '</td>' +
+              '<td>' + esc(o.from) + ' → ' + esc(o.to) + '</td>' +
+              '<td>' + esc(userName(o.logist)) + '</td>' +
+              '<td class="is-num">' + Exp.money(o.clientRate) + '</td>' +
+              '<td><button class="mgr-link" type="button" data-journal="' + o.id + '">Журнал</button></td></tr>';
+          }).join('') + '</tbody></table></div>';
+      }
+
+      function render() {
+        var period = PERIODS[state.period];
+        var users = Exp.load('users');
+        var list = ordersOfPeriod(Exp.load('orders'), state.period);
+        var empty = list.length === 0;
+        var lost = list.filter(function (o) { return o.status === 'lost'; });
+        var counts = DATA.lossReasons.map(function (reason) {
+          return lost.filter(function (o) { return o.lossReason === reason; }).length;
+        });
+
+        var from = addDays(TODAY, -(period.days - 1));
+        document.getElementById('period-sub').textContent = period.title + ': ' + rangeLabel(from, TODAY) + ' · заявки всех логистов компании';
+        Array.prototype.forEach.call(document.querySelectorAll('.mgr-period__btn'), function (btn) {
+          btn.setAttribute('aria-pressed', String(btn.getAttribute('data-period') === state.period));
+        });
+
+        // 4 карточки: заявки по статусам и маржа отдела (ФТ-26); отменённые в потери не входят (ФТ-07)
+        var margin = marginOf(list);
+        document.getElementById('stat-work').textContent = countBy(list, DATA.tabs.work);
+        document.getElementById('sub-work').textContent = empty ? period.sub : DATA.tabs.work.map(function (code) {
+          return DATA.statuses[code] + ' ' + countBy(list, [code]);
+        }).join(' · ');
+        document.getElementById('stat-closed').textContent = countBy(list, ['closed']);
+        document.getElementById('sub-closed').textContent = period.sub;
+        document.getElementById('stat-lost').textContent = lost.length;
+        document.getElementById('sub-lost').textContent = empty ? period.sub : 'Отменено ' + countBy(list, ['cancelled']) + ' — в потери не входят';
+        document.getElementById('stat-margin').textContent = signedMoney(margin);
+        document.getElementById('sub-margin').textContent = empty ? period.sub : 'по закрытым заявкам';
+
+        // потери по причинам
+        var lossesTotal = document.getElementById('losses-total');
+        var lossesBody = document.getElementById('losses-body');
+        lossesTotal.textContent = lost.length ? lost.length + ' ' + plural(lost.length, 'заявка', 'заявки', 'заявок') : '0';
+        lossesBody.innerHTML = lost.length ? reasonsHtml(counts) : '<p class="mgr-empty">За выбранный период потерь нет</p>';
+
+        // справа: заявки по выбранной причине или показатели по логистам
+        var title = document.getElementById('side-title');
+        var note = document.getElementById('side-note');
+        var reset = document.getElementById('reason-reset');
+        var sideBody = document.getElementById('side-body');
+        if (state.reason !== null && counts[state.reason]) {
+          var byReason = lost.filter(function (o) { return o.lossReason === DATA.lossReasons[state.reason]; });
+          title.textContent = 'Потерянные · «' + DATA.lossReasons[state.reason].split(',')[0] + '» · ' + byReason.length;
+          note.hidden = true;
+          reset.hidden = false;
+          sideBody.innerHTML = lostListHtml(byReason, users);
+        } else {
+          state.reason = null;
+          title.textContent = 'Показатели по логистам';
+          note.hidden = false;
+          note.textContent = 'по заявкам за период';
+          reset.hidden = true;
+          sideBody.innerHTML = empty ? '<p class="mgr-empty">' + esc(period.empty) + '</p>' : logistsHtml(list, users);
+        }
+      }
+
+      // Журнал действий по заявке (ФТ-27–ФТ-29, UC-08)
+      function journalOf(order) {
+        var all = DATA.journal ? Exp.load('journal') : [];
+        var entries = all.filter(function (e) { return e.orderId === order.id; });
+        if (!entries.length) {
+          entries = [{ at: order.createdAt, who: order.logist, action: 'Создал заявку (способ: ' + (order.source === 'ai' ? 'из текста или файла' : 'вручную') + ')' }];
+        }
+        return entries.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
+      }
+
+      var overlay = document.getElementById('journal-overlay');
+      var closeBtn = document.getElementById('journal-close');
+      var openLink = document.getElementById('journal-open');
+
+      function openJournal(orderId, trigger) {
+        var order = Exp.load('orders').filter(function (o) { return o.id === orderId; })[0];
+        if (!order) return;
+        lastFocus = trigger || null;
+        document.getElementById('journal-order').textContent = 'Заявка ' + order.id + ' · ' + order.from + ' → ' + order.to + ' · логист ' + userName(order.logist);
+        document.getElementById('journal-status').textContent = DATA.statuses[order.status];
+        document.getElementById('journal-list').innerHTML = journalOf(order).map(function (e) {
+          return '<li class="mgr-log__item"><div class="mgr-log__meta">' + Exp.date(e.at) + ' ' + e.at.slice(11, 16) + ' · ' + esc(userName(e.who)) + '</div>' +
+            '<div>' + esc(e.action) + '</div>' +
+            (e.detail ? '<div class="mgr-log__detail">' + esc(e.detail) + '</div>' : '') + '</li>';
+        }).join('');
+        openLink.setAttribute('href', 'order.html?id=' + encodeURIComponent(order.id));
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+        closeBtn.focus();
+      }
+
+      function closeJournal() {
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+        if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus();
+        lastFocus = null;
+      }
+
+      closeBtn.addEventListener('click', closeJournal);
+      overlay.addEventListener('click', function (event) { if (event.target === overlay) closeJournal(); });
+      document.addEventListener('keydown', function (event) {
+        if (overlay.hidden) return;
+        if (event.key === 'Escape') { closeJournal(); return; }
+        if (event.key === 'Tab') {
+          // фокус остаётся внутри панели
+          var first = closeBtn, last = openLink;
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+      });
+
+      // Переключатель периода: показатели пересчитываются сразу (UC-07)
+      Array.prototype.forEach.call(document.querySelectorAll('.mgr-period__btn'), function (btn) {
+        btn.addEventListener('click', function () {
+          state.period = btn.getAttribute('data-period');
+          state.reason = null;
+          render();
+        });
+      });
+
+      document.getElementById('losses-body').addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-reason]');
+        if (!btn || btn.disabled) return;
+        var index = Number(btn.getAttribute('data-reason'));
+        state.reason = state.reason === index ? null : index;
+        render();
+        var again = document.querySelector('[data-reason="' + index + '"]');
+        if (again) again.focus();
+      });
+
+      document.getElementById('reason-reset').addEventListener('click', function () {
+        state.reason = null;
+        render();
+      });
+
+      var sideBody = document.getElementById('side-body');
+      function openRow(row) {
+        if (row.hasAttribute('data-id')) location.href = 'order.html?id=' + encodeURIComponent(row.getAttribute('data-id'));
+        else if (row.hasAttribute('data-logist')) location.href = 'orders.html?logist=' + encodeURIComponent(row.getAttribute('data-logist'));
+      }
+      sideBody.addEventListener('click', function (event) {
+        var journalBtn = event.target.closest('[data-journal]');
+        if (journalBtn) { openJournal(Number(journalBtn.getAttribute('data-journal')), journalBtn); return; }
+        var row = event.target.closest('tr[data-id], tr[data-logist]');
+        if (row) openRow(row);
+      });
+      sideBody.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        var row = event.target.closest('tr[data-id], tr[data-logist]');
+        if (row && event.target === row) { event.preventDefault(); openRow(row); }
+      });
+
+      render();
+    })();
+  </script>
 </body>
 </html>
