@@ -3,40 +3,1131 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Карточка заявки — Экспедитор</title>
+  <title>Карточка заявки - Экспедитор</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/common.css">
+
+  <style>
+    /* Стили, специфичные только для карточки заявки. */
+    .order-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .order-head__title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .order-head__actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .order-progress {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      padding: 4px 0 2px;
+    }
+
+    .order-progress__step {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      color: var(--faint);
+      font-size: 12px;
+    }
+
+    .order-progress__step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      z-index: 0;
+      top: 12px;
+      left: 29px;
+      right: 8px;
+      height: 2px;
+      background: var(--line-2);
+    }
+
+    .order-progress__dot {
+      position: relative;
+      z-index: 1;
+      width: 24px;
+      height: 24px;
+      flex: 0 0 auto;
+      border: 2px solid var(--line);
+      border-radius: 50%;
+      background: var(--white);
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .order-progress__step.is-done,
+    .order-progress__step.is-active { color: var(--primary); }
+
+    .order-progress__step.is-done .order-progress__dot,
+    .order-progress__step.is-active .order-progress__dot {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--white);
+    }
+
+    .order-progress__step.is-done:not(:last-child)::after {
+      background: var(--primary);
+    }
+
+    .order-progress__label {
+      position: relative;
+      z-index: 1;
+      padding-right: 8px;
+      background: var(--bg);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .section-title__meta {
+      margin-top: 3px;
+      color: var(--mute);
+      font-size: 12px;
+    }
+
+    .order-info-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0;
+      border: 1px solid var(--line-2);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .order-info__item {
+      min-width: 0;
+      padding: 12px;
+      border-right: 1px solid var(--line-2);
+      background: #fff;
+    }
+
+    .order-info__item:last-child { border-right: 0; }
+
+    .order-info__label {
+      color: var(--mute);
+      font-size: 11px;
+    }
+
+    .order-info__value {
+      margin-top: 4px;
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    .order-info__cargo {
+      margin-top: 10px;
+      padding: 11px 12px;
+      border-radius: var(--radius);
+      background: #fafafe;
+    }
+
+    .order-info__cargo strong {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 12px;
+    }
+
+    .matching-card { padding: 0; overflow: hidden; }
+
+    .matching-card__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line-2);
+    }
+
+    .matching-card__body { padding: 0; }
+
+    .matching-banner { margin: 14px 16px 0; }
+
+    .matching-empty {
+      min-height: 260px;
+      display: grid;
+      place-items: center;
+    }
+
+    .matching-loading {
+      min-height: 280px;
+      padding: 40px 24px;
+      text-align: center;
+    }
+
+    .spinner {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 16px;
+      border: 5px solid #e7e1ff;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .85s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-sources {
+      width: min(430px, 100%);
+      margin: 20px auto 0;
+      display: grid;
+      gap: 8px;
+      text-align: left;
+    }
+
+    .loading-source {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--line-2);
+      border-radius: var(--radius);
+      background: #fafafe;
+    }
+
+    .carrier-name { font-weight: 600; }
+
+    .rep {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .rep::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--faint);
+    }
+
+    .rep--good::before { background: var(--success); }
+    .rep--mid::before { background: var(--accent); }
+    .rep--bad::before { background: var(--danger); }
+
+    .selected-summary {
+      margin: 16px;
+      display: grid;
+      grid-template-columns: 1.5fr repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .selected-summary__item {
+      padding: 13px 14px;
+      border: 1px solid var(--line-2);
+      border-radius: var(--radius);
+      background: #fafafe;
+    }
+
+    .selected-summary__label {
+      color: var(--mute);
+      font-size: 11px;
+    }
+
+    .selected-summary__value {
+      margin-top: 4px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .selected-summary__item--margin {
+      background: var(--success-soft);
+      border-color: #c5e6d3;
+      color: #23784d;
+    }
+
+    .radio-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .radio-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+
+    .radio-card:hover {
+      border-color: #b9b0f6;
+      background: #fbfaff;
+    }
+
+    .radio-card input {
+      margin-top: 2px;
+      accent-color: var(--primary);
+    }
+
+    @media (max-width: 980px) {
+      .order-info-grid { grid-template-columns: repeat(3, 1fr); }
+      .order-info__item:nth-child(3) { border-right: 0; }
+      .selected-summary { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
 </head>
+
 <body data-page="order" data-roles="logist,manager">
   <header id="app-header"></header>
 
   <main class="page">
     <nav id="crumbs"></nav>
-    <div class="page-head">
-      <h1 id="order-title">Заявка</h1>
-    </div>
 
-    <!-- Делает Таисия (вёрстка) и Анна (логика в js/order-logic.js). Figma: колонка 3.
-         Номер заявки берётся из адреса страницы: order.html?id=1024 -->
+    <section class="order-head" aria-labelledby="order-title">
+      <div>
+        <div class="order-head__title">
+          <h1 id="order-title">Заявка</h1>
+          <span class="status-chip" id="order-status">Статус</span>
+        </div>
+      </div>
+
+      <div class="order-head__actions" id="order-actions">
+        <button class="btn" type="button" id="edit-order-btn">Редактировать</button>
+        <button class="btn btn--danger" type="button" id="cancel-order-btn">Отменить заявку</button>
+        <button class="btn" type="button" id="lost-order-btn">Отметить потерянной</button>
+      </div>
+    </section>
+
+    <section class="order-progress" aria-label="Этапы заявки">
+      <div class="order-progress__step" data-progress="new">
+        <span class="order-progress__dot">1</span>
+        <span class="order-progress__label">Новая</span>
+      </div>
+      <div class="order-progress__step" data-progress="in_work">
+        <span class="order-progress__dot">2</span>
+        <span class="order-progress__label">В работе</span>
+      </div>
+      <div class="order-progress__step" data-progress="carrier_chosen">
+        <span class="order-progress__dot">3</span>
+        <span class="order-progress__label">Перевозчик выбран</span>
+      </div>
+      <div class="order-progress__step" data-progress="closed">
+        <span class="order-progress__dot">4</span>
+        <span class="order-progress__label">Закрыта</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="order-info-title">
+      <div class="section-title">
+        <h2 id="order-info-title">Данные заявки</h2>
+      </div>
+
+      <div class="order-info-grid">
+        <div class="order-info__item">
+          <div class="order-info__label">Откуда</div>
+          <div class="order-info__value" id="order-from">-</div>
+        </div>
+        <div class="order-info__item">
+          <div class="order-info__label">Куда</div>
+          <div class="order-info__value" id="order-to">-</div>
+        </div>
+        <div class="order-info__item">
+          <div class="order-info__label">Дата загрузки</div>
+          <div class="order-info__value" id="order-load-date">-</div>
+        </div>
+        <div class="order-info__item">
+          <div class="order-info__label">Тип машины</div>
+          <div class="order-info__value" id="order-truck-type">-</div>
+        </div>
+        <div class="order-info__item">
+          <div class="order-info__label">Вес</div>
+          <div class="order-info__value" id="order-weight">-</div>
+        </div>
+        <div class="order-info__item">
+          <div class="order-info__label">Ставка клиента</div>
+          <div class="order-info__value" id="order-client-rate">-</div>
+        </div>
+      </div>
+
+      <div class="order-info__cargo">
+        <strong>Груз / дополнительные условия</strong>
+        <span id="order-cargo">-</span>
+      </div>
+    </section>
+
+    <section class="card matching-card" aria-labelledby="matching-title">
+      <div class="matching-card__head">
+        <div>
+          <h2 id="matching-title">Подбор перевозчиков</h2>
+          <div class="section-title__meta" id="matching-meta">Предложения по заявке</div>
+        </div>
+        <button class="btn" type="button" id="repeat-match-btn">Подобрать заново</button>
+      </div>
+
+      <div class="matching-card__body">
+        <div class="matching-empty" id="matching-new" hidden>
+          <div class="empty-state">
+            <div class="empty-state__icon" aria-hidden="true">↗</div>
+            <h2>Перевозчики еще не подобраны</h2>
+            <p>Запустите подбор, и предложения с ATI.SU и из вашей базы появятся здесь одной таблицей.</p>
+            <div class="empty-state__actions">
+              <button class="btn btn--primary" type="button" id="start-match-btn">Подобрать перевозчиков</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="matching-loading" id="matching-loading" hidden>
+          <div class="spinner" aria-hidden="true"></div>
+          <h2>Идет подбор...</h2>
+          <p class="muted">Ищем предложения на ATI.SU и в вашей базе</p>
+          <div class="loading-sources">
+            <div class="loading-source"><strong>ATI.SU</strong><span class="muted">поиск предложений...</span></div>
+            <div class="loading-source"><strong>Ваша база</strong><span class="muted">поиск предложений...</span></div>
+          </div>
+        </div>
+
+        <div id="matching-results" hidden>
+          <div class="matching-banner alert alert--warning" id="ati-warning" hidden>
+            <span class="alert__icon">!</span>
+            <div>
+              <strong>Данные ATI.SU в подборку не вошли</strong>
+              Биржа недоступна, показаны только перевозчики из вашей базы.
+            </div>
+          </div>
+
+          <div class="table-wrap" style="max-height: 410px; overflow-y: auto;">
+            <table class="data-table" aria-label="Предложения перевозчиков">
+              <thead>
+                <tr>
+                  <th style="width: 18%">Перевозчик</th>
+                  <th style="width: 11%">Источник</th>
+                  <th style="width: 10%">Ставка</th>
+                  <th style="width: 8%">Рейтинг</th>
+                  <th style="width: 14%">Репутация</th>
+                  <th style="width: 10%">Тип машины</th>
+                  <th style="width: 15%">Метки</th>
+                  <th style="width: 14%">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="offers-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="matching-empty" id="matching-empty" hidden>
+          <div class="empty-state">
+            <div class="empty-state__icon" aria-hidden="true">⌕</div>
+            <h2>Подходящих предложений не нашлось</h2>
+            <p>Ни на ATI.SU, ни в вашей базе нет перевозчиков под эту заявку. Измените тип машины, вес или дату загрузки и попробуйте снова.</p>
+            <div class="empty-state__actions">
+              <button class="btn" type="button">Редактировать заявку</button>
+              <button class="btn btn--primary" type="button" data-show-state="results">Подобрать заново</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="matching-selected" hidden>
+          <div class="selected-summary">
+            <div class="selected-summary__item">
+              <div class="selected-summary__label">Перевозчик</div>
+              <div class="selected-summary__value" id="selected-carrier">-</div>
+            </div>
+            <div class="selected-summary__item">
+              <div class="selected-summary__label">Ставка клиента</div>
+              <div class="selected-summary__value" id="selected-client-rate">-</div>
+            </div>
+            <div class="selected-summary__item">
+              <div class="selected-summary__label">Ставка перевозчика</div>
+              <div class="selected-summary__value" id="selected-carrier-rate">-</div>
+            </div>
+            <div class="selected-summary__item selected-summary__item--margin">
+              <div class="selected-summary__label">Маржа</div>
+              <div class="selected-summary__value" id="selected-margin">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <aside class="popover" id="rating-popover" hidden aria-labelledby="rating-popover-title">
+    <div class="popover__head">
+      <div>
+        <div class="popover__title" id="rating-popover-title">Как посчитан рейтинг</div>
+        <div class="muted" id="rating-popover-carrier"></div>
+      </div>
+      <button class="popover__close" type="button" data-close-popover aria-label="Закрыть">×</button>
+    </div>
+    <div class="popover__body">
+      <div class="popover-grid">
+        <div class="popover-stat">
+          <div class="popover-stat__label">Стоимость</div>
+          <div class="popover-stat__value" id="rating-cost-value">-</div>
+          <div class="popover-stat__points" id="rating-cost-points">-</div>
+        </div>
+        <div class="popover-stat">
+          <div class="popover-stat__label">Опыт работы</div>
+          <div class="popover-stat__value" id="rating-exp-value">-</div>
+          <div class="popover-stat__points" id="rating-exp-points">-</div>
+        </div>
+        <div class="popover-stat">
+          <div class="popover-stat__label">Репутация</div>
+          <div class="popover-stat__value" id="rating-rep-value">-</div>
+          <div class="popover-stat__points" id="rating-rep-points">-</div>
+        </div>
+        <div class="popover-stat">
+          <div class="popover-stat__label">Соответствие машины</div>
+          <div class="popover-stat__value" id="rating-truck-value">-</div>
+          <div class="popover-stat__points" id="rating-truck-points">-</div>
+        </div>
+      </div>
+      <div class="popover-total" id="rating-total">Итого: -</div>
+    </div>
+  </aside>
+
+  <aside class="popover" id="carrier-popover" hidden aria-labelledby="carrier-popover-title">
+    <div class="popover__head">
+      <div>
+        <div class="popover__title" id="carrier-popover-title">О перевозчике</div>
+        <div class="muted" id="carrier-popover-source"></div>
+      </div>
+      <button class="popover__close" type="button" data-close-popover aria-label="Закрыть">×</button>
+    </div>
+    <div class="popover__body">
+      <div class="modal-kv">
+        <div><div class="modal-kv__label">Телефон</div><div class="modal-kv__value" id="carrier-phone">-</div></div>
+        <div><div class="modal-kv__label">Выполнено рейсов</div><div class="modal-kv__value" id="carrier-trips">-</div></div>
+        <div><div class="modal-kv__label">Последний рейс</div><div class="modal-kv__value" id="carrier-last-trip">-</div></div>
+        <div><div class="modal-kv__label">Претензии</div><div class="modal-kv__value" id="carrier-claims">-</div></div>
+        <div><div class="modal-kv__label">Репутация</div><div class="modal-kv__value" id="carrier-reputation">-</div></div>
+        <div><div class="modal-kv__label">ИНН</div><div class="modal-kv__value" id="carrier-inn">-</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="modal-backdrop" id="choose-modal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="choose-modal-title">
+      <div class="modal__head">
+        <div class="modal__title" id="choose-modal-title">Выбрать перевозчика</div>
+        <button class="modal__close" type="button" data-modal-close aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="modal__body">
+        <div class="modal-kv">
+          <div><div class="modal-kv__label">Перевозчик</div><div class="modal-kv__value" id="choose-carrier-name">-</div></div>
+          <div><div class="modal-kv__label">Ставка клиента</div><div class="modal-kv__value" id="choose-client-rate">-</div></div>
+        </div>
+
+        <label class="field">
+          <span class="field__label">Ставка перевозчика, ₽</span>
+          <input class="field__control" id="choose-rate" type="number" min="1" step="1000">
+          <span class="field__hint">Можно изменить, если договорились о другой сумме</span>
+        </label>
+
+        <div class="margin-box" id="choose-margin-box">
+          <div class="margin-box__label">Маржа</div>
+          <div class="margin-box__value" id="choose-margin">-</div>
+          <div class="margin-box__meta" id="choose-margin-percent"></div>
+        </div>
+
+        <div class="alert alert--danger" id="negative-margin-alert" hidden>
+          <span class="alert__icon">!</span>
+          <div>
+            <strong>Маржа отрицательная или нулевая</strong>
+            Ставка перевозчика не ниже ставки клиента, на этой заявке компания не заработает.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn" type="button" data-modal-close>Отмена</button>
+        <button class="btn btn--primary" type="button" id="confirm-carrier-btn">Подтвердить выбор</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="lost-modal" hidden>
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="lost-modal-title">
+      <div class="modal__head">
+        <div>
+          <div class="modal__title" id="lost-modal-title">Отметить заявку потерянной</div>
+          <div class="muted">Выберите причину. Список закрытый, пункт "Другое" не используется.</div>
+        </div>
+        <button class="modal__close" type="button" data-modal-close aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="modal__body">
+        <div class="radio-list" id="loss-reasons"></div>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn" type="button" data-modal-close>Отмена</button>
+        <button class="btn btn--primary" type="button" id="confirm-lost-btn" disabled>Подтвердить</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="cancel-modal" hidden>
+    <section class="modal modal--sm" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title">
+      <div class="modal__head">
+        <div class="modal__title" id="cancel-modal-title">Отменить заявку?</div>
+        <button class="modal__close" type="button" data-modal-close aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="modal__body">
+        <p class="muted">Заявка получит статус "Отменена". Действие будет зафиксировано в журнале.</p>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn" type="button" data-modal-close>Не отменять</button>
+        <button class="btn btn--danger" type="button" id="confirm-cancel-btn">Отменить заявку</button>
+      </div>
+    </section>
+  </div>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
-  <!-- <script src="js/order-logic.js"></script>  подключить, когда Анна пришлёт файл -->
+  <!-- <script src="js/order-logic.js"></script> подключить, когда Анна пришлет файл -->
+
   <script>
-    var id = Number(new URLSearchParams(location.search).get('id'));
-    var order = Exp.load('orders').find(function (o) { return o.id === id; });
-    if (order) {
-      var route = order.from + ' → ' + order.to;
-      Exp.crumbs([['Заявки', 'orders.html'], [route]]);
-      document.getElementById('order-title').textContent = route;
-      document.title = route + ' — Экспедитор';
-    } else {
-      Exp.crumbs([['Заявки', 'orders.html'], ['Заявка не найдена']]);
-      document.getElementById('order-title').textContent = 'Заявка не найдена';
-    }
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var id = Number(params.get('id'));
+      var previewState = params.get('state');
+      var orders = Exp.load('orders');
+      var carriers = Exp.load('carriers');
+      var order = orders.find(function (o) { return o.id === id; });
+
+      var statusClass = {
+        new: 'status-chip--new',
+        in_work: 'status-chip--in-work',
+        carrier_chosen: 'status-chip--carrier',
+        closed: 'status-chip--closed',
+        cancelled: 'status-chip--cancelled',
+        lost: 'status-chip--lost'
+      };
+
+      var progressOrder = ['new', 'in_work', 'carrier_chosen', 'closed'];
+
+      /*
+        В data.js пока нет отдельного массива offers.
+        Это временные демонстрационные предложения для верстки колонки 3.
+        order-logic.js сможет заменить их реальными данными без изменения HTML/CSS.
+      */
+      var DEMO_OFFERS = [
+        {
+          id: 'offer-1', carrierId: 1, name: 'ТрансЛогистик', source: 'ati',
+          rate: 75000, rating: 90, truckType: 'Тент',
+          rep: 'Хорошая · 0 из 15', repClass: 'good',
+          badges: ['recommended', 'cheapest'],
+          score: { cost: 35, experience: 15, reputation: 30, truck: 10 }
+        },
+        {
+          id: 'offer-2', carrierId: 4, name: 'ИП Сидоров А. В.', source: 'own',
+          rate: 82000, rating: 77, truckType: 'Тент',
+          rep: 'Средняя · 1 из 10', repClass: 'mid',
+          badges: ['verified'],
+          score: { cost: 22, experience: 12, reputation: 25, truck: 18 }
+        },
+        {
+          id: 'offer-3', carrierId: 3, name: 'ООО «Балт-Экспресс»', source: 'own',
+          rate: 79000, rating: 64, truckType: 'Тент',
+          rep: 'Средняя · 1 из 12', repClass: 'mid',
+          badges: [],
+          score: { cost: 27, experience: 10, reputation: 17, truck: 10 }
+        },
+        {
+          id: 'offer-4', carrierId: 5, name: 'ООО «Волга-Транзит»', source: 'ati',
+          rate: 90000, rating: 57, truckType: 'Тент',
+          rep: 'Плохая · 2 из 8', repClass: 'bad',
+          badges: [],
+          score: { cost: 12, experience: 10, reputation: 15, truck: 20 }
+        },
+        {
+          id: 'offer-5', carrierId: 6, name: 'ИП Назаров Д. К.', source: 'ati',
+          rate: 90000, rating: 53, truckType: 'Тент',
+          rep: 'Плохая · 1 из 5', repClass: 'bad',
+          badges: [],
+          score: { cost: 12, experience: 8, reputation: 13, truck: 20 }
+        },
+        {
+          id: 'offer-6', carrierId: 7, name: 'ООО «Рефтранс-Норд»', source: 'ati',
+          rate: 81000, rating: 47, truckType: 'Изотерм',
+          rep: 'Плохая · 2 из 5', repClass: 'bad',
+          badges: [],
+          score: { cost: 24, experience: 7, reputation: 11, truck: 5 }
+        }
+      ];
+
+      function pawIcon() {
+        return '<svg class="paw-icon" viewBox="0 0 24 24" aria-hidden="true">' +
+          '<circle cx="7.2" cy="6.3" r="2.2"></circle>' +
+          '<circle cx="16.8" cy="6.3" r="2.2"></circle>' +
+          '<circle cx="4.8" cy="11.1" r="2"></circle>' +
+          '<circle cx="19.2" cy="11.1" r="2"></circle>' +
+          '<path d="M12 10.2c-3.6 0-6.2 2.6-6.2 5.5 0 2.2 1.7 3.8 4 3.8 1.1 0 1.7-.4 2.2-.4s1.1.4 2.2.4c2.3 0 4-1.6 4-3.8 0-2.9-2.6-5.5-6.2-5.5z"></path>' +
+        '</svg>';
+      }
+
+      function escape(value) {
+        return Exp.escapeHtml(value == null ? '' : value);
+      }
+
+      function badgeHtml(code) {
+        if (code === 'recommended') return '<span class="badge badge--recommended">Рекомендовано</span>';
+        if (code === 'cheapest') return '<span class="badge badge--cheapest">Самый дешевый</span>';
+        if (code === 'verified') return '<span class="badge badge--verified">Проверенный</span>';
+        return '';
+      }
+
+      function ratingClass(value) {
+        if (value >= 75) return 'rating rating--good';
+        if (value >= 55) return 'rating rating--mid';
+        return 'rating rating--low';
+      }
+
+      function sourceHtml(offer) {
+        if (offer.source === 'own') {
+          return '<span class="own-source" title="Перевозчик из вашей базы">' +
+            pawIcon() + '<span>Наша база</span></span>';
+        }
+        return '<span class="muted" style="font-size:12px;">ATI.SU</span>';
+      }
+
+      function offerHtml(offer) {
+        var rowClass = offer.badges.indexOf('recommended') !== -1
+          ? ' class="data-table__row--recommended"'
+          : '';
+
+        return '<tr' + rowClass + ' data-offer-id="' + offer.id + '">' +
+          '<td><span class="carrier-name">' + escape(offer.name) + '</span></td>' +
+          '<td>' + sourceHtml(offer) + '</td>' +
+          '<td><strong>' + Exp.money(offer.rate) + '</strong></td>' +
+          '<td><span class="' + ratingClass(offer.rating) + '">' + offer.rating + '</span></td>' +
+          '<td><span class="rep rep--' + offer.repClass + '">' + escape(offer.rep) + '</span></td>' +
+          '<td>' + escape(offer.truckType) + '</td>' +
+          '<td><div class="badges">' + offer.badges.map(badgeHtml).join('') + '</div></td>' +
+          '<td><div class="table-actions">' +
+            '<button class="table-link" type="button" data-carrier-popover="' + offer.id + '">О перевозчике</button>' +
+            '<button class="table-link" type="button" data-rating-popover="' + offer.id + '">Как посчитан рейтинг</button>' +
+            '<button class="btn btn--primary btn--sm" type="button" data-choose-offer="' + offer.id + '">Выбрать</button>' +
+          '</div></td>' +
+        '</tr>';
+      }
+
+      function renderOffers(ownOnly) {
+        var rows = ownOnly
+          ? DEMO_OFFERS.filter(function (o) { return o.source === 'own'; })
+          : DEMO_OFFERS;
+
+        document.getElementById('offers-body').innerHTML = rows.map(offerHtml).join('');
+        document.getElementById('matching-meta').textContent =
+          'Найдено предложений: ' + rows.length + ' · Лучшие по рейтингу показаны первыми';
+
+        bindOfferActions();
+      }
+
+      function setStatus(status) {
+        var chip = document.getElementById('order-status');
+        chip.className = 'status-chip ' + (statusClass[status] || '');
+        chip.textContent = DATA.statuses[status] || status;
+
+        var activeIndex = progressOrder.indexOf(status);
+        if (status === 'lost' || status === 'cancelled') activeIndex = 1;
+
+        Array.prototype.forEach.call(document.querySelectorAll('[data-progress]'), function (step, index) {
+          step.classList.toggle('is-done', index < activeIndex);
+          step.classList.toggle('is-active', index === activeIndex);
+        });
+      }
+
+      function hideMatchingStates() {
+        ['matching-new', 'matching-loading', 'matching-results', 'matching-empty', 'matching-selected']
+          .forEach(function (name) {
+            document.getElementById(name).hidden = true;
+          });
+
+        document.getElementById('ati-warning').hidden = true;
+      }
+
+      function showMatchingState(state) {
+        hideMatchingStates();
+
+        if (state === 'new') {
+          document.getElementById('matching-new').hidden = false;
+          document.getElementById('repeat-match-btn').hidden = true;
+          return;
+        }
+
+        if (state === 'loading') {
+          document.getElementById('matching-loading').hidden = false;
+          document.getElementById('repeat-match-btn').hidden = true;
+          return;
+        }
+
+        if (state === 'empty') {
+          document.getElementById('matching-empty').hidden = false;
+          document.getElementById('repeat-match-btn').hidden = false;
+          return;
+        }
+
+        if (state === 'selected') {
+          document.getElementById('matching-selected').hidden = false;
+          document.getElementById('repeat-match-btn').hidden = false;
+          fillSelectedCarrier();
+          return;
+        }
+
+        document.getElementById('matching-results').hidden = false;
+        document.getElementById('repeat-match-btn').hidden = false;
+
+        var atiError = state === 'ati-error';
+        document.getElementById('ati-warning').hidden = !atiError;
+        renderOffers(atiError);
+      }
+
+      function defaultMatchingState() {
+        if (!order) return 'empty';
+        if (previewState) return previewState;
+        if (order.status === 'new') return 'new';
+        if (order.status === 'carrier_chosen' || order.status === 'closed') return 'selected';
+        return 'results';
+      }
+
+      function fillSelectedCarrier() {
+        if (!order) return;
+
+        var carrier = carriers.find(function (c) { return c.id === order.carrierId; });
+        var carrierRate = Number(order.carrierRate || 0);
+        var margin = Number(order.clientRate || 0) - carrierRate;
+
+        document.getElementById('selected-carrier').textContent =
+          carrier ? carrier.name : 'Не выбран';
+
+        document.getElementById('selected-client-rate').textContent =
+          Exp.money(order.clientRate || 0);
+
+        document.getElementById('selected-carrier-rate').textContent =
+          carrierRate ? Exp.money(carrierRate) : 'нет данных';
+
+        document.getElementById('selected-margin').textContent =
+          carrierRate ? Exp.money(margin) : 'нет данных';
+      }
+
+      function placePopover(popover, anchor) {
+        var rect = anchor.getBoundingClientRect();
+        popover.hidden = false;
+
+        var width = popover.offsetWidth;
+        var height = popover.offsetHeight;
+        var left = Math.min(rect.left, window.innerWidth - width - 16);
+        var top = rect.bottom + 8;
+
+        if (top + height > window.innerHeight - 16) {
+          top = Math.max(16, rect.top - height - 8);
+        }
+
+        popover.style.left = Math.max(16, left) + 'px';
+        popover.style.top = top + 'px';
+      }
+
+      function closePopovers() {
+        document.getElementById('rating-popover').hidden = true;
+        document.getElementById('carrier-popover').hidden = true;
+      }
+
+      function carrierByOffer(offer) {
+        return carriers.find(function (c) { return c.id === offer.carrierId; }) || null;
+      }
+
+      function reputationText(carrier) {
+        if (!carrier || !carrier.trips) return 'нет данных';
+        var ratio = carrier.claims / carrier.trips;
+        if (ratio === 0) return 'Хорошая';
+        if (ratio <= 0.12) return 'Средняя';
+        return 'Плохая';
+      }
+
+      function openCarrierPopover(offer, anchor) {
+        var carrier = carrierByOffer(offer);
+
+        document.getElementById('carrier-popover-title').textContent = offer.name;
+        document.getElementById('carrier-popover-source').innerHTML =
+          offer.source === 'own' ? pawIcon() + ' Наша база' : 'ATI.SU';
+
+        document.getElementById('carrier-phone').textContent =
+          carrier && carrier.phone ? carrier.phone : 'нет данных';
+
+        document.getElementById('carrier-trips').textContent =
+          carrier ? String(carrier.trips) : 'нет данных';
+
+        document.getElementById('carrier-last-trip').textContent =
+          carrier && carrier.lastTrip ? Exp.date(carrier.lastTrip) : 'нет данных';
+
+        document.getElementById('carrier-claims').textContent =
+          carrier && carrier.trips ? String(carrier.claims) : 'нет данных';
+
+        document.getElementById('carrier-reputation').textContent =
+          reputationText(carrier);
+
+        document.getElementById('carrier-inn').textContent =
+          carrier && carrier.inn ? carrier.inn : 'нет данных';
+
+        closePopovers();
+        placePopover(document.getElementById('carrier-popover'), anchor);
+      }
+
+      function openRatingPopover(offer, anchor) {
+        var carrier = carrierByOffer(offer);
+        var score = offer.score;
+
+        document.getElementById('rating-popover-carrier').textContent = offer.name;
+
+        document.getElementById('rating-cost-value').textContent =
+          Exp.money(offer.rate);
+        document.getElementById('rating-cost-points').textContent =
+          '+' + score.cost;
+
+        document.getElementById('rating-exp-value').textContent =
+          carrier && carrier.trips ? carrier.trips + ' рейсов' : 'нет данных';
+        document.getElementById('rating-exp-points').textContent =
+          '+' + score.experience;
+
+        document.getElementById('rating-rep-value').textContent =
+          offer.rep;
+        document.getElementById('rating-rep-points').textContent =
+          '+' + score.reputation;
+
+        document.getElementById('rating-truck-value').textContent =
+          offer.truckType + (offer.truckType === order.truckType ? ' · совпадает' : ' · не совпадает');
+        document.getElementById('rating-truck-points').textContent =
+          '+' + score.truck;
+
+        document.getElementById('rating-total').textContent =
+          'Итого: ' + offer.rating;
+
+        closePopovers();
+        placePopover(document.getElementById('rating-popover'), anchor);
+      }
+
+      var activeOffer = null;
+
+      function updateMargin() {
+        if (!order || !activeOffer) return;
+
+        var rate = Number(document.getElementById('choose-rate').value || 0);
+        var margin = Number(order.clientRate) - rate;
+        var percent = order.clientRate ? margin / order.clientRate * 100 : 0;
+        var negative = margin <= 0;
+
+        document.getElementById('choose-margin').textContent =
+          Exp.money(margin);
+
+        document.getElementById('choose-margin-percent').textContent =
+          percent.toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + '% от ставки клиента';
+
+        document.getElementById('choose-margin-box')
+          .classList.toggle('margin-box--negative', negative);
+
+        document.getElementById('negative-margin-alert').hidden = !negative;
+
+        var button = document.getElementById('confirm-carrier-btn');
+        button.textContent =
+          negative ? 'Все равно подтвердить' : 'Подтвердить выбор';
+
+        button.classList.toggle('btn--primary', !negative);
+        button.classList.toggle('btn--danger', negative);
+      }
+
+      function openChooseModal(offer) {
+        activeOffer = offer;
+
+        document.getElementById('choose-carrier-name').textContent =
+          offer.name;
+
+        document.getElementById('choose-client-rate').textContent =
+          Exp.money(order.clientRate);
+
+        document.getElementById('choose-rate').value =
+          offer.rate;
+
+        document.getElementById('choose-modal').hidden = false;
+
+        updateMargin();
+      }
+
+      function closeModals() {
+        Array.prototype.forEach.call(document.querySelectorAll('.modal-backdrop'), function (modal) {
+          modal.hidden = true;
+        });
+      }
+
+      function bindOfferActions() {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-carrier-popover]'), function (button) {
+          button.addEventListener('click', function () {
+            var offer = DEMO_OFFERS.find(function (o) {
+              return o.id === button.getAttribute('data-carrier-popover');
+            });
+
+            if (offer) openCarrierPopover(offer, button);
+          });
+        });
+
+        Array.prototype.forEach.call(document.querySelectorAll('[data-rating-popover]'), function (button) {
+          button.addEventListener('click', function () {
+            var offer = DEMO_OFFERS.find(function (o) {
+              return o.id === button.getAttribute('data-rating-popover');
+            });
+
+            if (offer) openRatingPopover(offer, button);
+          });
+        });
+
+        Array.prototype.forEach.call(document.querySelectorAll('[data-choose-offer]'), function (button) {
+          button.addEventListener('click', function () {
+            var offer = DEMO_OFFERS.find(function (o) {
+              return o.id === button.getAttribute('data-choose-offer');
+            });
+
+            if (offer) openChooseModal(offer);
+          });
+        });
+      }
+
+      function renderLossReasons() {
+        var wrap = document.getElementById('loss-reasons');
+
+        wrap.innerHTML = DATA.lossReasons.map(function (reason) {
+          return '<label class="radio-card">' +
+            '<input type="radio" name="loss-reason" value="' + escape(reason) + '">' +
+            '<span>' + escape(reason) + '</span>' +
+          '</label>';
+        }).join('');
+
+        Array.prototype.forEach.call(wrap.querySelectorAll('input'), function (input) {
+          input.addEventListener('change', function () {
+            document.getElementById('confirm-lost-btn').disabled = false;
+          });
+        });
+      }
+
+      function fillOrder() {
+        var route = order.from + ' → ' + order.to;
+
+        Exp.crumbs([['Заявки', 'orders.html'], [route]]);
+        document.getElementById('order-title').textContent = route;
+        document.title = route + ' - Экспедитор';
+
+        document.getElementById('order-from').textContent = order.from;
+        document.getElementById('order-to').textContent = order.to;
+        document.getElementById('order-load-date').textContent = Exp.date(order.loadDate);
+        document.getElementById('order-truck-type').textContent = order.truckType;
+        document.getElementById('order-weight').textContent = order.weightT + ' т';
+        document.getElementById('order-client-rate').textContent = Exp.money(order.clientRate);
+        document.getElementById('order-cargo').textContent = order.cargo || 'нет данных';
+
+        setStatus(order.status);
+        showMatchingState(defaultMatchingState());
+
+        var locked =
+          order.status === 'closed' ||
+          order.status === 'cancelled' ||
+          order.status === 'lost';
+
+        document.getElementById('edit-order-btn').disabled = locked;
+        document.getElementById('cancel-order-btn').disabled = locked;
+        document.getElementById('lost-order-btn').disabled = locked;
+      }
+
+      if (!order) {
+        Exp.crumbs([['Заявки', 'orders.html'], ['Заявка не найдена']]);
+        document.getElementById('order-title').textContent = 'Заявка не найдена';
+        document.getElementById('order-status').hidden = true;
+        document.querySelector('.order-progress').hidden = true;
+        document.querySelector('.card[aria-labelledby="order-info-title"]').hidden = true;
+        document.querySelector('.matching-card').hidden = true;
+        document.getElementById('order-actions').hidden = true;
+      } else {
+        fillOrder();
+      }
+
+      renderLossReasons();
+
+      document.getElementById('choose-rate').addEventListener('input', updateMargin);
+
+      document.getElementById('lost-order-btn').addEventListener('click', function () {
+        document.getElementById('lost-modal').hidden = false;
+      });
+
+      document.getElementById('cancel-order-btn').addEventListener('click', function () {
+        document.getElementById('cancel-modal').hidden = false;
+      });
+
+      document.getElementById('start-match-btn').addEventListener('click', function () {
+        showMatchingState('loading');
+      });
+
+      document.getElementById('repeat-match-btn').addEventListener('click', function () {
+        showMatchingState('loading');
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-show-state]'), function (button) {
+        button.addEventListener('click', function () {
+          showMatchingState(button.getAttribute('data-show-state'));
+        });
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-modal-close]'), function (button) {
+        button.addEventListener('click', closeModals);
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll('[data-close-popover]'), function (button) {
+        button.addEventListener('click', closePopovers);
+      });
+
+      Array.prototype.forEach.call(document.querySelectorAll('.modal-backdrop'), function (backdrop) {
+        backdrop.addEventListener('click', function (event) {
+          if (event.target === backdrop) closeModals();
+        });
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          closeModals();
+          closePopovers();
+        }
+      });
+
+      document.addEventListener('click', function (event) {
+        if (
+          !event.target.closest('.popover') &&
+          !event.target.closest('[data-carrier-popover]') &&
+          !event.target.closest('[data-rating-popover]')
+        ) {
+          closePopovers();
+        }
+      });
+    })();
   </script>
 </body>
 </html>
