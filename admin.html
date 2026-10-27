@@ -6,23 +6,1135 @@
   <title>Администрирование — Экспедитор</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/common.css">
+  <!-- SheetJS для чтения XLSX -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Палитра из manager.html (фиолетовый акцент, светлый фон) */
+    body[data-page="admin"] {
+      --bg: #f8f9fc;
+      --ink: #10152e;
+      --mute: #6e778b;
+      --faint: #98a0b5;
+      --line: #e3e7f1;
+      --line-2: #f0f2f6;
+      --primary: #6650f5;
+      --primary-hover: #5840ef;
+      --primary-soft: #ece9ff;
+      --success: #008f54;
+      --success-soft: #e3f3ea;
+      --danger: #d61f31;
+      --danger-soft: #ffe9eb;
+      --radius: 8px;
+      --radius-lg: 8px;
+      --shadow-sm: 0 1px 3px rgba(16, 21, 46, .05);
+      --shadow-md: 0 14px 36px rgba(16, 21, 46, .15);
+    }
+
+    body[data-page="admin"] .app-header { border-bottom-color: var(--line); }
+    
+    /* Таблицы */
+    body[data-page="admin"] .data-table th { 
+      height: 36px; 
+      background: var(--bg); 
+      color: var(--mute); 
+      border-bottom: 1px solid var(--line);
+    }
+    body[data-page="admin"] .data-table td { 
+      height: 44px; 
+      padding-top: 0; 
+      padding-bottom: 0; 
+      vertical-align: middle; 
+      border-top: 1px solid var(--line);
+    }
+    body[data-page="admin"] .data-table tbody tr:hover { background: var(--bg); }
+
+    /* Кнопки */
+    body[data-page="admin"] .btn { 
+      border-color: var(--line); 
+      background: #fff; 
+    }
+    body[data-page="admin"] .btn:hover { 
+      border-color: var(--primary); 
+      color: var(--primary); 
+    }
+    body[data-page="admin"] .btn--primary { 
+      border-color: var(--primary); 
+      background: var(--primary); 
+      color: #fff; 
+    }
+    body[data-page="admin"] .btn--primary:hover { 
+      border-color: var(--primary-hover); 
+      background: var(--primary-hover); 
+      color: #fff;
+    }
+
+    /* Поля ввода */
+    body[data-page="admin"] .field__control { border-color: var(--line); }
+    body[data-page="admin"] .field__control:focus { 
+      border-color: var(--primary); 
+      box-shadow: 0 0 0 3px rgba(102, 80, 245, 0.12); 
+    }
+
+    /* Кастомные элементы страницы */
+    .panel { display: flex; flex-direction: column; gap: 16px; }
+    .card__head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+    .card__head h2 { font-size: 16px; }
+    .card__head .muted { font-size: 13px; }
+    
+    #import-alert { margin-bottom: 14px; }
+    #import-alert:empty { display: none; margin: 0; }
+
+    .dropzone { 
+      display: flex; flex-direction: column; align-items: center; gap: 10px; 
+      padding: 28px 16px; border: 1px dashed var(--line); border-radius: 8px; 
+      background: #fff; text-align: center; transition: border-color .15s, background .15s; 
+    }
+    .dropzone.is-over { border-color: var(--primary); background: var(--bg); }
+    .dropzone__title { font-size: 14px; }
+    .dropzone__hint { color: var(--mute); font-size: 12px; }
+    .dropzone-note { margin-top: 12px; color: var(--mute); font-size: 13px; line-height: 1.5; }
+
+    .file-chip { 
+      padding: 4px 9px; border: 1px solid var(--line); border-radius: 6px; 
+      background: var(--bg); color: var(--mute); font-size: 12px; white-space: nowrap; 
+    }
+
+    .stats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; margin-bottom: 18px; }
+    .stat { padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+    .stat__label { color: var(--mute); font-size: 13px; }
+    .stat__value { margin-top: 6px; font-size: 26px; font-weight: 600; line-height: 1.1; color: var(--ink); }
+    .stat__hint { margin-top: 4px; color: var(--mute); font-size: 12px; }
+
+    .preview-subtitle { margin-bottom: 10px; font-size: 15px; font-weight: 600; }
+    .preview-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+    .chip { 
+      display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px; 
+      border: 1px solid var(--line); border-radius: 6px; background: #fff; 
+      color: var(--ink); font-size: 12px; font-weight: 600; white-space: nowrap; 
+    }
+    .chip--off { background: var(--bg); color: var(--mute); border-color: var(--line); }
+
+    .table-actions { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .link-btn { 
+      padding: 0; border: 0; background: none; color: var(--primary); font-size: 13px; 
+      text-decoration: underline; text-underline-offset: 2px; 
+      text-decoration-color: rgba(102, 80, 245, 0.4); cursor: pointer; 
+    }
+    .link-btn:hover { color: var(--primary-hover); text-decoration-color: var(--primary-hover); }
+    .dot-sep { color: var(--line); }
+
+    .filters { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+    .filters .field__label { font-size: 12px; font-weight: 400; color: var(--mute); }
+    .journal-empty { padding: 26px 12px; text-align: center; color: var(--mute); }
+
+    .radios { display: flex; flex-direction: column; gap: 9px; }
+    .radio { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--ink); }
+    .radio input { width: 15px; height: 15px; accent-color: var(--primary); }
+
+    .kv-block { padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+    .kv-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 4px 0; font-size: 13px; color: var(--ink); }
+    .kv-row__label { color: var(--mute); }
+    .pass-row { display: flex; gap: 8px; }
+    .pass-row .field__control { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .3px; }
+
+    @media (max-width: 860px) { .stats, .filters { grid-template-columns: 1fr; } }
+  </style>
 </head>
+
 <body data-page="admin" data-roles="admin">
   <header id="app-header"></header>
 
   <main class="page">
     <div class="page-head">
+      <nav id="crumbs"></nav>
       <h1>Администрирование</h1>
     </div>
 
-    <!-- Делает Егор. Figma: колонка 6.
-         Вкладки: база перевозчиков (загрузка файла, проверка, ошибки),
-         сотрудники (список, добавление, блокировка), журнал действий. -->
+    <div class="tabs" role="tablist" aria-label="Разделы администрирования">
+      <button type="button" class="tab is-active" role="tab" data-tab="carriers" aria-selected="true">
+        База перевозчиков
+      </button>
+      <button type="button" class="tab" role="tab" data-tab="staff" aria-selected="false">
+        Сотрудники <span class="tab__count" id="staff-count">0</span>
+      </button>
+      <button type="button" class="tab" role="tab" data-tab="journal" aria-selected="false">
+        Журнал действий
+      </button>
+    </div>
+
+    <!-- ============ Вкладка 1: База перевозчиков ============ -->
+    <section class="panel" id="panel-carriers" role="tabpanel" aria-label="База перевозчиков">
+      <div class="card" id="upload-card">
+        <div class="card__head">
+          <h2>Загрузка базы перевозчиков</h2>
+          <span class="muted" id="carriers-updated"></span>
+        </div>
+        <div id="import-alert"></div>
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone__title">Перетащите файл сюда или</div>
+          <button type="button" class="btn" id="choose-file">Выбрать файл</button>
+          <div class="dropzone__hint">CSV или XLSX, до 10 МБ</div>
+          <input type="file" id="file-input" accept=".csv,.xlsx" class="visually-hidden">
+        </div>
+        <p class="dropzone-note">
+          Обязательные колонки: «Название / ФИО», «Телефон», «Тип машины». «ИНН» по желанию: по нему,
+          а если его нет, по связке «название + телефон» обновляются уже загруженные перевозчики без дублей.
+        </p>
+      </div>
+
+      <div class="card" id="preview-card" hidden>
+        <div class="card__head">
+          <h2>Проверка файла перед загрузкой</h2>
+          <span class="file-chip" id="preview-file"></span>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat__label">Будет добавлено</div>
+            <div class="stat__value" id="preview-added">0</div>
+            <div class="stat__hint">новые перевозчики</div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">Будет обновлено</div>
+            <div class="stat__value" id="preview-updated">0</div>
+            <div class="stat__hint">совпали по ИНН или «название + телефон»</div>
+          </div>
+          <div class="stat">
+            <div class="stat__label">Отклонено</div>
+            <div class="stat__value" id="preview-rejected">0</div>
+            <div class="stat__hint">не попадут в базу</div>
+          </div>
+        </div>
+        <h3 class="preview-subtitle">Отклонённые строки</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:90px">Строка</th>
+                <th style="width:280px">Перевозчик</th>
+                <th>Причина</th>
+              </tr>
+            </thead>
+            <tbody id="preview-rows"></tbody>
+          </table>
+        </div>
+        <div class="preview-actions">
+          <button type="button" class="btn" id="preview-cancel">Отмена</button>
+          <button type="button" class="btn btn--primary" id="preview-confirm">Загрузить</button>
+        </div>
+      </div>
+
+      <div class="card" id="history-card">
+        <div class="card__head">
+          <h2>История загрузок</h2>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:170px">Дата и время</th>
+                <th>Файл</th>
+                <th style="width:190px">Кто загрузил</th>
+                <th style="width:110px">Добавлено</th>
+                <th style="width:110px">Обновлено</th>
+                <th style="width:110px">Отклонено</th>
+              </tr>
+            </thead>
+            <tbody id="imports-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Вкладка 2: Сотрудники ============ -->
+    <section class="panel" id="panel-staff" role="tabpanel" aria-label="Сотрудники" hidden>
+      <div class="card">
+        <div class="card__head">
+          <h2>Сотрудники компании</h2>
+          <button type="button" class="btn btn--primary" id="add-staff">+ Добавить сотрудника</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ФИО</th>
+                <th style="width:180px">Логин</th>
+                <th style="width:170px">Роль</th>
+                <th style="width:170px">Статус</th>
+                <th style="width:230px">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="staff-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Вкладка 3: Журнал действий ============ -->
+    <section class="panel" id="panel-journal" role="tabpanel" aria-label="Журнал действий" hidden>
+      <div class="card">
+        <div class="card__head">
+          <h2>Журнал действий</h2>
+          <span class="muted">только записи вашей компании</span>
+        </div>
+        <div class="filters">
+          <label class="field">
+            <span class="field__label">Период</span>
+            <select class="field__control" id="f-period"></select>
+          </label>
+          <label class="field">
+            <span class="field__label">Инициатор</span>
+            <select class="field__control" id="f-who"></select>
+          </label>
+          <label class="field">
+            <span class="field__label">Тип действия</span>
+            <select class="field__control" id="f-type"></select>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:160px">Дата и время</th>
+                <th style="width:190px">Инициатор</th>
+                <th style="width:210px">Действие</th>
+                <th style="width:210px">Объект</th>
+                <th>Подробности</th>
+              </tr>
+            </thead>
+            <tbody id="journal-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var user = Exp.user;
+    if (!user) return;
+
+    // Используем Exp.crumbs из app.js
+    if (Exp.crumbs) {
+      Exp.crumbs([['Администрирование']]);
+    }
+
+    var $ = function (s, r) { return (r || document).querySelector(s); };
+    var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+    var esc = Exp.escapeHtml;
+
+    var IMPORTS_KEY = 'exp_admin_imports';
+    var JOURNAL_KEY = 'exp_admin_journal';
+
+    function readStore(k, fb) {
+      try { var r = localStorage.getItem(k); if (r) return JSON.parse(r); } catch (e) {}
+      return fb;
+    }
+    function writeStore(k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {}
+    }
+
+    var users = Exp.load('users');
+    var carriers = Exp.load('carriers');
+    var imports = readStore(IMPORTS_KEY, [
+      { at: '2026-10-18T14:32', file: 'perevozchiki_oktyabr.xlsx', who: 'irina', added: 46, updated: 12, rejected: 3 },
+      { at: '2026-10-02T10:15', file: 'baza_sentyabr.csv', who: 'irina', added: 78, updated: 0, rejected: 5 }
+    ]);
+    var journalExtra = readStore(JOURNAL_KEY, [
+      { at: '2026-10-25T10:12', who: 'irina',  action: 'Создание сотрудника',        object: 'Захаров Павел (логист)', detail: '—' },
+      { at: '2026-10-25T09:58', who: 'irina',  action: 'Блокировка сотрудника',      object: 'Никитин Сергей',         detail: 'Активен → Заблокирован' },
+      { at: '2026-10-18T09:01', who: 'system', action: 'Блокировка входа на 5 минут', object: 'o.petrova',              detail: '5 неверных попыток входа' }
+    ]);
+
+    function saveUsers()        { Exp.save('users', users); }
+    function saveCarriers()     { Exp.save('carriers', carriers); }
+    function saveImports()      { writeStore(IMPORTS_KEY, imports); }
+    function saveJournalExtra() { writeStore(JOURNAL_KEY, journalExtra); }
+
+    var pad = function (n) { return n < 10 ? '0' + n : String(n); };
+    function fmtDateTime(iso) {
+      var d = new Date(iso); if (isNaN(d.getTime())) return iso;
+      return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() +
+        ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    function nowISO() {
+      var d = new Date();
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    function userName(login) {
+      if (login === 'system') return 'Система';
+      var u = users.find(function (x) { return x.login === login; });
+      return u ? u.name : login;
+    }
+    function roleLabel(r) {
+      return { logist: 'Логист', manager: 'Руководитель', admin: 'Администратор' }[r] || r;
+    }
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' Б';
+      if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' КБ';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+    }
+
+    function switchTab(name) {
+      $$('.tab').forEach(function (btn) {
+        var active = btn.getAttribute('data-tab') === name;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      ['carriers', 'staff', 'journal'].forEach(function (p) {
+        var el = $('#panel-' + p); if (el) el.hidden = p !== name;
+      });
+      if (name === 'staff')   renderStaff();
+      if (name === 'journal') renderJournal();
+    }
+    $$('.tab').forEach(function (btn) {
+      btn.addEventListener('click', function () { switchTab(btn.getAttribute('data-tab')); });
+    });
+
+    function showAlert(kind, title, text) {
+      var el = $('#import-alert'); if (!el) return;
+      var icon = kind === 'danger' ? '!' : kind === 'success' ? '✓' : 'i';
+      el.innerHTML = '<div class="alert alert--' + kind + '">' +
+        '<span class="alert__icon">' + icon + '</span>' +
+        '<div><strong>' + esc(title) + '</strong>' + esc(text) + '</div></div>';
+    }
+    function clearAlert() {
+      var el = $('#import-alert'); if (el) el.innerHTML = '';
+    }
+
+    function renderCarriersUpdated() {
+      var el = $('#carriers-updated'); if (!el) return;
+      var last = imports.length ? imports[0].at : (DATA.carriersUpdatedAt || '');
+      el.textContent = last ? 'Данные обновлены: ' + fmtDateTime(last) : '';
+    }
+    function renderImportsHistory() {
+      var tbody = $('#imports-rows'); if (!tbody) return;
+      if (!imports.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="journal-empty">Загрузок ещё не было</td></tr>';
+        return;
+      }
+      tbody.innerHTML = imports.map(function (it) {
+        return '<tr>' +
+          '<td>' + esc(fmtDateTime(it.at)) + '</td>' +
+          '<td>' + esc(it.file) + '</td>' +
+          '<td>' + esc(userName(it.who)) + '</td>' +
+          '<td>' + it.added + '</td>' +
+          '<td>' + it.updated + '</td>' +
+          '<td>' + it.rejected + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    function readAsArrayBuffer(file) {
+      return new Promise(function (res, rej) {
+        var fr = new FileReader();
+        fr.onload = function () { res(fr.result); };
+        fr.onerror = function () { rej(fr.error); };
+        fr.readAsArrayBuffer(file);
+      });
+    }
+    async function readAsTextSmart(file) {
+      var buf = await readAsArrayBuffer(file);
+      var bytes = new Uint8Array(buf);
+      var text;
+      if (bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+        text = new TextDecoder('utf-8').decode(bytes.subarray(3));
+      } else {
+        text = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+        if (text.indexOf('\uFFFD') !== -1) {
+          try { text = new TextDecoder('windows-1251').decode(bytes); } catch (e) {}
+        }
+      }
+      return text;
+    }
+    function parseCSV(text) {
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      var firstLine = text.split(/\r?\n/)[0] || '';
+      var counts = { ',': 0, ';': 0, '\t': 0 };
+      var inQ = false;
+      for (var k = 0; k < firstLine.length; k++) {
+        var ch = firstLine[k];
+        if (ch === '"') inQ = !inQ;
+        else if (!inQ && counts[ch] !== undefined) counts[ch]++;
+      }
+      var delim = Object.keys(counts).reduce(function (a, b) { return counts[a] >= counts[b] ? a : b; });
+      var rows = [];
+      var cur = [], field = '', inQuotes = false, line = 1, rowStartLine = 1;
+      for (var i = 0; i < text.length; i++) {
+        var c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { field += '"'; i++; }
+            else inQuotes = false;
+          } else {
+            if (c === '\n') line++;
+            field += c;
+          }
+        } else {
+          if (c === '"') inQuotes = true;
+          else if (c === delim) { cur.push(field); field = ''; }
+          else if (c === '\n') {
+            cur.push(field); field = '';
+            rows.push({ line: rowStartLine, cells: cur });
+            cur = []; line++; rowStartLine = line;
+          } else if (c === '\r') { /* skip */ }
+          else field += c;
+        }
+      }
+      if (field !== '' || cur.length) {
+        cur.push(field);
+        rows.push({ line: rowStartLine, cells: cur });
+      }
+      return rows;
+    }
+    function parseXLSX(buffer) {
+      var wb = XLSX.read(buffer, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+      return aoa.map(function (cells, i) {
+        return {
+          line: i + 1,
+          cells: (cells || []).map(function (c) { return c == null ? '' : String(c); })
+        };
+      });
+    }
+
+    function normalizeKey(s) {
+      return String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+    function digitsOnly(s) { return String(s == null ? '' : s).replace(/\D/g, ''); }
+    function keyOf(c) {
+      var inn = digitsOnly(c.inn);
+      if (inn) return 'inn:' + inn;
+      return 'np:' + normalizeKey(c.name) + '|' + digitsOnly(c.phone);
+    }
+
+    var HEADER_ALIASES = {
+      name:      ['название / фио', 'название/фио', 'название', 'фио', 'наименование', 'перевозчик', 'компания'],
+      phone:     ['телефон', 'phone', 'тел.', 'тел', 'контакт', 'контактный телефон'],
+      truckType: ['тип машины', 'типы машин', 'тип тс', 'тип транспорта', 'машина', 'транспорт'],
+      inn:       ['инн', 'инн компании']
+    };
+    function detectHeader(row) {
+      var map = { name: -1, phone: -1, truckType: -1, inn: -1 };
+      (row || []).forEach(function (cell, i) {
+        var v = normalizeKey(cell);
+        if (!v) return;
+        Object.keys(HEADER_ALIASES).forEach(function (field) {
+          if (map[field] !== -1) return;
+          if (HEADER_ALIASES[field].some(function (a) { return v === a || v.indexOf(a) !== -1; })) {
+            map[field] = i;
+          }
+        });
+      });
+      return map;
+    }
+
+    function importRows(rawRows) {
+      if (!rawRows.length) return { ok: false, error: 'Файл пуст.' };
+      var firstNonEmpty = rawRows.findIndex(function (r) {
+        return r.cells.some(function (c) { return String(c).trim() !== ''; });
+      });
+      if (firstNonEmpty === -1) return { ok: false, error: 'В файле нет данных.' };
+
+      var headerRow = rawRows[firstNonEmpty];
+      var header = detectHeader(headerRow.cells);
+      var missing = [];
+      if (header.name === -1)      missing.push('«Название / ФИО»');
+      if (header.phone === -1)     missing.push('«Телефон»');
+      if (header.truckType === -1) missing.push('«Тип машины»');
+      if (missing.length) {
+        return { ok: false, error: 'В файле нет колонок: ' + missing.join(', ') + '. Файл отклонён целиком, база не изменилась.' };
+      }
+
+      var valid = [], errors = [];
+      for (var i = firstNonEmpty + 1; i < rawRows.length; i++) {
+        var row = rawRows[i];
+        var cells = row.cells || [];
+        if (!cells.some(function (c) { return String(c).trim() !== ''; })) continue;
+
+        var name = String(cells[header.name] == null ? '' : cells[header.name]).trim();
+        var phone = String(cells[header.phone] == null ? '' : cells[header.phone]).trim();
+        var truckRaw = String(cells[header.truckType] == null ? '' : cells[header.truckType]).trim();
+        var inn = header.inn >= 0 ? String(cells[header.inn] == null ? '' : cells[header.inn]).replace(/\s+/g, '').trim() : '';
+
+        var problems = [];
+        if (!name) problems.push('Не указано название / ФИО');
+        if (!phone) problems.push('Не указан телефон');
+        if (!truckRaw) problems.push('Не указан тип машины');
+
+        var truckTypes = [];
+        if (truckRaw) {
+          var allowed = DATA.truckTypes.slice();
+          var allowedLower = allowed.map(function (t) { return t.toLowerCase(); });
+          truckRaw.split(/[,;|]+/).map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (p) {
+            var idx = allowedLower.indexOf(p.toLowerCase());
+            if (idx >= 0) { if (truckTypes.indexOf(allowed[idx]) === -1) truckTypes.push(allowed[idx]); }
+            else problems.push('Неизвестный тип машины: «' + p + '». Допустимые: ' + allowed.join(', '));
+          });
+          if (!truckTypes.length && problems.length === 0) problems.push('Не указан тип машины');
+        }
+        if (inn && !/^(\d{10}|\d{12})$/.test(inn)) {
+          problems.push('ИНН должен содержать 10 или 12 цифр');
+        }
+        if (problems.length) {
+          errors.push({ line: row.line, carrier: name || '—', reason: problems.join('; ') });
+        } else {
+          valid.push({ line: row.line, name: name, phone: phone, truckTypes: truckTypes, inn: inn });
+        }
+      }
+      if (!valid.length && !errors.length) {
+        return { ok: false, error: 'В файле нет строк с данными перевозчиков.' };
+      }
+
+      var working = carriers.map(function (c) { return Object.assign({}, c); });
+      var idxByKey = new Map();
+      working.forEach(function (c, i) { idxByKey.set(keyOf(c), i); });
+
+      var maxId = 0;
+      working.forEach(function (c) { if (c.id && c.id > maxId) maxId = c.id; });
+      var nextId = maxId + 1, added = 0, updated = 0;
+
+      valid.forEach(function (r) {
+        var k = keyOf(r);
+        if (idxByKey.has(k)) {
+          var idx = idxByKey.get(k);
+          var ex = working[idx];
+          ex.name = r.name; ex.phone = r.phone; ex.truckTypes = r.truckTypes.slice();
+          if (r.inn) ex.inn = r.inn;
+          updated++;
+        } else {
+          working.push({ id: nextId++, name: r.name, inn: r.inn || '', phone: r.phone,
+            truckTypes: r.truckTypes.slice(), trips: 0, claims: 0, lastTrip: null, source: 'own' });
+          idxByKey.set(k, working.length - 1);
+          added++;
+        }
+      });
+
+      if (added + updated === 0) {
+        return { ok: false, error: 'Ни одна строка не прошла проверку. Проверьте причины в списке ниже.', errors: errors };
+      }
+      return { ok: true, working: working, added: added, updated: updated, rejected: errors.length, errors: errors };
+    }
+
+    var pending = null;
+    function pickExt(name) {
+      var m = /\.([a-z0-9]+)$/i.exec(name || '');
+      return m ? m[1].toLowerCase() : '';
+    }
+
+    async function handleFile(file) {
+      clearAlert();
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        showAlert('danger', 'Файл не загружен', 'Файл больше 10 МБ. Размер загружаемого файла ограничен 10 МБ (НФТ-31).');
+        return;
+      }
+      var ext = pickExt(file.name);
+      if (ext !== 'csv' && ext !== 'xlsx') {
+        showAlert('danger', 'Файл не загружен',
+          'Формат .' + ext + ' не поддерживается. Загрузите файл CSV или XLSX. Ранее загруженная база не изменилась.');
+        return;
+      }
+
+      var rawRows;
+      try {
+        if (ext === 'csv') {
+          var text = await readAsTextSmart(file);
+          rawRows = parseCSV(text);
+        } else {
+          if (typeof XLSX === 'undefined') {
+            showAlert('danger', 'Не удалось прочитать XLSX',
+              'Библиотека для чтения XLSX не загрузилась (нет доступа в интернет). Сохраните файл как CSV и загрузите снова.');
+            return;
+          }
+          var buf = await readAsArrayBuffer(file);
+          rawRows = parseXLSX(buf);
+        }
+      } catch (err) {
+        showAlert('danger', 'Не удалось прочитать файл',
+          'Файл повреждён или имеет неверный формат. Ранее загруженная база не изменилась.');
+        return;
+      }
+
+      var res = importRows(rawRows);
+      if (!res.ok) {
+        showAlert('danger', 'Файл не загружен', res.error);
+        if (res.errors && res.errors.length) {
+          pending = { fileName: file.name, size: formatSize(file.size),
+            added: 0, updated: 0, rejected: res.errors.length, errors: res.errors, working: null };
+          renderPreview();
+          $('#preview-card').hidden = false;
+          $('#upload-card').hidden = true;
+          var btn = $('#preview-confirm');
+          btn.disabled = true;
+          btn.textContent = 'Загрузить';
+        }
+        return;
+      }
+      pending = { fileName: file.name, size: formatSize(file.size),
+        added: res.added, updated: res.updated, rejected: res.rejected, errors: res.errors, working: res.working };
+      renderPreview();
+      $('#preview-card').hidden = false;
+      $('#upload-card').hidden = true;
+    }
+
+    function renderPreview() {
+      if (!pending) return;
+      $('#preview-file').textContent = pending.fileName + (pending.size ? ' · ' + pending.size : '');
+      $('#preview-added').textContent    = pending.added;
+      $('#preview-updated').textContent  = pending.updated;
+      $('#preview-rejected').textContent = pending.rejected;
+
+      var tbody = $('#preview-rows');
+      var errs = pending.errors || [];
+      if (!errs.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="journal-empty">Ошибочных строк нет</td></tr>';
+      } else {
+        var shown = errs.slice(0, 200);
+        var html = shown.map(function (r) {
+          return '<tr><td>' + r.line + '</td><td>' + esc(r.carrier) + '</td><td>' + esc(r.reason) + '</td></tr>';
+        }).join('');
+        if (errs.length > shown.length) {
+          html += '<tr><td colspan="3" class="journal-empty">… и ещё ' + (errs.length - shown.length) + ' строк(и)</td></tr>';
+        }
+        tbody.innerHTML = html;
+      }
+
+      var btn = $('#preview-confirm');
+      if (pending.working) {
+        btn.disabled = false;
+        btn.textContent = 'Загрузить ' + (pending.added + pending.updated) + ' перевозчиков';
+      } else {
+        btn.disabled = true;
+        btn.textContent = 'Загрузить';
+      }
+    }
+
+    function resetUpload() {
+      pending = null;
+      $('#preview-card').hidden = true;
+      $('#upload-card').hidden = false;
+      clearAlert();
+      var fi = $('#file-input'); if (fi) fi.value = '';
+    }
+
+    function confirmImport() {
+      if (!pending || !pending.working) return;
+      var at = nowISO();
+      var fname = pending.fileName;
+      var added = pending.added, updated = pending.updated, rejected = pending.rejected;
+      carriers = pending.working;
+      saveCarriers();
+      imports.unshift({ at: at, file: fname, who: user.login, added: added, updated: updated, rejected: rejected });
+      saveImports();
+      journalExtra.unshift({
+        at: at, who: user.login,
+        action: 'Загрузка базы перевозчиков',
+        object: fname,
+        detail: '+' + added + ', обновлено ' + updated + ', отклонено ' + rejected
+      });
+      saveJournalExtra();
+      renderCarriersUpdated();
+      renderImportsHistory();
+      resetUpload();
+      showAlert('success', 'Файл загружен',
+        'Добавлено ' + added + ', обновлено ' + updated + ', отклонено ' + rejected + '.');
+    }
+
+    var fileInput = $('#file-input');
+    var dropzone = $('#dropzone');
+    $('#choose-file').addEventListener('click', function () { fileInput.click(); });
+    dropzone.addEventListener('click', function (e) {
+      if (e.target === dropzone ||
+          e.target.classList.contains('dropzone__title') ||
+          e.target.classList.contains('dropzone__hint')) {
+        fileInput.click();
+      }
+    });
+    fileInput.addEventListener('change', function () {
+      if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+    ['dragenter', 'dragover'].forEach(function (ev) {
+      dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.add('is-over'); });
+    });
+    ['dragleave', 'drop'].forEach(function (ev) {
+      dropzone.addEventListener(ev, function (e) { e.preventDefault(); dropzone.classList.remove('is-over'); });
+    });
+    dropzone.addEventListener('drop', function (e) {
+      var f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+    $('#preview-cancel').addEventListener('click', resetUpload);
+    $('#preview-confirm').addEventListener('click', confirmImport);
+
+    function renderStaff() {
+      var tbody = $('#staff-rows'); if (!tbody) return;
+      var countEl = $('#staff-count'); if (countEl) countEl.textContent = users.length;
+      tbody.innerHTML = users.map(function (u) {
+        var isSelf = u.login === user.login;
+        var statusChip = u.active ? '<span class="chip">Активен</span>' : '<span class="chip chip--off">Заблокирован</span>';
+        var actions = '<button type="button" class="link-btn" data-act="edit" data-login="' + esc(u.login) + '">Изменить</button>';
+        if (!isSelf) {
+          actions += u.active
+            ? '<span class="dot-sep">·</span><button type="button" class="link-btn" data-act="block" data-login="' + esc(u.login) + '">Заблокировать</button>'
+            : '<span class="dot-sep">·</span><button type="button" class="link-btn" data-act="unblock" data-login="' + esc(u.login) + '">Разблокировать</button>';
+        }
+        return '<tr>' +
+          '<td>' + esc(u.name) + (isSelf ? ' <span class="muted">(вы)</span>' : '') + '</td>' +
+          '<td>' + esc(u.login) + '</td>' +
+          '<td>' + esc(roleLabel(u.role)) + '</td>' +
+          '<td>' + statusChip + '</td>' +
+          '<td><div class="table-actions">' + actions + '</div></td>' +
+          '</tr>';
+      }).join('');
+      $$('[data-act]', tbody).forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var l = btn.getAttribute('data-login'), a = btn.getAttribute('data-act');
+          if (a === 'edit') openEdit(l);
+          else if (a === 'block') openBlock(l);
+          else if (a === 'unblock') unblock(l);
+        });
+      });
+    }
+
+    function openModal(build) {
+      closeModal();
+      var bd = document.createElement('div');
+      bd.className = 'modal-backdrop'; bd.id = 'admin-modal';
+      bd.innerHTML = '<div class="modal" role="dialog" aria-modal="true"></div>';
+      document.body.appendChild(bd);
+      build(bd.querySelector('.modal'));
+      bd.addEventListener('click', function (e) { if (e.target === bd) closeModal(); });
+      var onEsc = function (e) { if (e.key === 'Escape') closeModal(); };
+      document.addEventListener('keydown', onEsc);
+      bd._esc = onEsc;
+    }
+    function closeModal() {
+      var m = document.getElementById('admin-modal'); if (!m) return;
+      if (m._esc) document.removeEventListener('keydown', m._esc);
+      m.remove();
+    }
+
+    function modalShell(title, body, actions) {
+      return '<div class="modal__head">' +
+        '<div class="modal__title">' + esc(title) + '</div>' +
+        '<button type="button" class="modal__close" data-close aria-label="Закрыть">×</button>' +
+        '</div>' +
+        '<div class="modal__body">' + (body || '') + '</div>' +
+        '<div class="modal__actions">' + (actions || '') + '</div>';
+    }
+    function wireClose(root) {
+      $$('[data-close]', root).forEach(function (b) { b.addEventListener('click', closeModal); });
+    }
+
+    function openAdd() {
+      openModal(function (root) {
+        root.classList.add('modal--sm');
+        root.innerHTML = modalShell('Новый сотрудник', '', '');
+
+        root.querySelector('.modal__body').innerHTML =
+          '<div class="field" data-field="name">' +
+            '<label class="field__label">ФИО <span class="field__required">*</span></label>' +
+            '<input class="field__control" data-name type="text" autocomplete="off">' +
+            '<div class="field__error">Укажите ФИО сотрудника</div>' +
+          '</div>' +
+          '<div class="field" data-field="login">' +
+            '<label class="field__label">Логин <span class="field__required">*</span></label>' +
+            '<input class="field__control" data-login type="text" autocomplete="off">' +
+            '<div class="field__error">Укажите логин</div>' +
+          '</div>' +
+          '<div class="field" data-field="role">' +
+            '<div class="field__label">Роль <span class="field__required">*</span></div>' +
+            '<div class="radios">' +
+              '<label class="radio"><input type="radio" name="role" value="logist">Логист</label>' +
+              '<label class="radio"><input type="radio" name="role" value="manager">Руководитель</label>' +
+              '<label class="radio"><input type="radio" name="role" value="admin">Администратор</label>' +
+            '</div>' +
+            '<div class="field__error">Выберите роль</div>' +
+          '</div>' +
+          '<p class="muted" style="font-size:12px">Пароль задавать не нужно: система создаст временный пароль и покажет его один раз.</p>';
+
+        root.querySelector('.modal__actions').innerHTML =
+          '<button type="button" class="btn" data-close>Отмена</button>' +
+          '<button type="button" class="btn btn--primary" data-submit>Создать</button>';
+
+        wireClose(root);
+
+        root.querySelector('[data-submit]').addEventListener('click', function () {
+          var nF = root.querySelector('[data-field="name"]');
+          var lF = root.querySelector('[data-field="login"]');
+          var rF = root.querySelector('[data-field="role"]');
+          var n = root.querySelector('[data-name]').value.trim();
+          var l = root.querySelector('[data-login]').value.trim();
+          var r = (root.querySelector('input[name="role"]:checked') || {}).value;
+          var lErr = lF.querySelector('.field__error');
+          lErr.textContent = 'Укажите логин';
+
+          nF.classList.remove('is-error');
+          lF.classList.remove('is-error');
+          rF.classList.remove('is-error');
+
+          var ok = true;
+          if (!n) { nF.classList.add('is-error'); ok = false; }
+          if (!l) { lF.classList.add('is-error'); ok = false; }
+          else if (users.some(function (u) { return u.login === l; })) {
+            lErr.textContent = 'Логин уже занят. Свободный вариант: ' + l + '2';
+            lF.classList.add('is-error');
+            ok = false;
+          }
+          if (!r) { rF.classList.add('is-error'); ok = false; }
+          if (!ok) return;
+
+          var pass = 'K7m-29xq-Lp';
+          users.push({ login: l, password: pass, name: n, short: n.split(' ')[0], role: r, active: true });
+          saveUsers();
+
+          journalExtra.unshift({
+            at: nowISO(), who: user.login,
+            action: 'Создание сотрудника',
+            object: n + ' (' + roleLabel(r) + ')',
+            detail: '—'
+          });
+          saveJournalExtra();
+          renderStaff();
+          showTempPassword(n, roleLabel(r), l, pass);
+        });
+      });
+    }
+
+    function showTempPassword(name, role, login, pass) {
+      openModal(function (root) {
+        root.classList.add('modal--sm');
+        root.innerHTML = modalShell('Учётная запись создана',
+          '<div class="kv-block">' +
+            '<div class="kv-row"><span class="kv-row__label">Сотрудник</span><span>' + esc(name) + '</span></div>' +
+            '<div class="kv-row"><span class="kv-row__label">Роль</span><span>' + esc(role) + '</span></div>' +
+            '<div class="kv-row"><span class="kv-row__label">Логин</span><span>' + esc(login) + '</span></div>' +
+          '</div>' +
+          '<div class="field">' +
+            '<label class="field__label">Временный пароль</label>' +
+            '<div class="pass-row">' +
+              '<input class="field__control" readonly value="' + esc(pass) + '">' +
+              '<button type="button" class="btn" data-copy>Копировать</button>' +
+            '</div>' +
+          '</div>' +
+          '<p style="font-size:12.5px;line-height:1.5">Пароль показывается один раз. Передайте логин и пароль сотруднику лично: после закрытия окна пароль больше не будет показан.</p>',
+          '<button type="button" class="btn btn--primary" data-close>Готово</button>');
+        wireClose(root);
+        var cb = root.querySelector('[data-copy]');
+        cb.addEventListener('click', function () {
+          var inp = root.querySelector('input[readonly]');
+          inp.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          cb.textContent = 'Скопировано';
+          cb.disabled = true;
+        });
+      });
+    }
+
+    function openEdit(login) {
+      var u = users.find(function (x) { return x.login === login; });
+      if (!u) return;
+      var isSelf = u.login === user.login;
+
+      openModal(function (root) {
+        root.classList.add('modal--sm');
+        root.innerHTML = modalShell('Сотрудник', '', '');
+
+        root.querySelector('.modal__body').innerHTML =
+          '<div class="field" data-field="name">' +
+            '<label class="field__label">ФИО</label>' +
+            '<input class="field__control" data-name type="text" value="' + esc(u.name) + '">' +
+            '<div class="field__error">Укажите ФИО</div>' +
+          '</div>' +
+          '<div class="field">' +
+            '<label class="field__label">Логин</label>' +
+            '<input class="field__control" type="text" value="' + esc(u.login) + '" disabled>' +
+          '</div>' +
+          '<div class="field" data-field="role">' +
+            '<div class="field__label">Роль</div>' +
+            '<div class="radios">' +
+              '<label class="radio"><input type="radio" name="edit-role" value="logist"'  + (u.role === 'logist'  ? ' checked' : '') + (isSelf ? ' disabled' : '') + '>Логист</label>' +
+              '<label class="radio"><input type="radio" name="edit-role" value="manager"' + (u.role === 'manager' ? ' checked' : '') + (isSelf ? ' disabled' : '') + '>Руководитель</label>' +
+              '<label class="radio"><input type="radio" name="edit-role" value="admin"'   + (u.role === 'admin'   ? ' checked' : '') + (isSelf ? ' disabled' : '') + '>Администратор</label>' +
+            '</div>' +
+            (isSelf ? '<p class="muted" style="font-size:12px">Свою роль изменить нельзя</p>' : '') +
+          '</div>';
+
+        root.querySelector('.modal__actions').innerHTML =
+          '<button type="button" class="btn" data-close>Отмена</button>' +
+          '<button type="button" class="btn btn--primary" data-save>Сохранить изменения</button>';
+
+        wireClose(root);
+
+        root.querySelector('[data-save]').addEventListener('click', function () {
+          var nF = root.querySelector('[data-field="name"]');
+          var n = root.querySelector('[data-name]').value.trim();
+          var r = (root.querySelector('input[name="edit-role"]:checked') || {}).value;
+
+          nF.classList.remove('is-error');
+          if (!n) { nF.classList.add('is-error'); return; }
+
+          var changed = [];
+          if (u.name !== n) { changed.push('ФИО'); u.name = n; u.short = n.split(' ')[0]; }
+          if (r && r !== u.role) { changed.push('роль'); u.role = r; }
+
+          if (changed.length) {
+            saveUsers();
+            journalExtra.unshift({
+              at: nowISO(), who: user.login,
+              action: 'Изменение сотрудника',
+              object: u.name,
+              detail: 'изменено: ' + changed.join(', ')
+            });
+            saveJournalExtra();
+          }
+          renderStaff();
+          closeModal();
+        });
+      });
+    }
+
+    function openBlock(login) {
+      var u = users.find(function (x) { return x.login === login; });
+      if (!u) return;
+      openModal(function (root) {
+        root.classList.add('modal--sm');
+        root.innerHTML = modalShell('Заблокировать сотрудника',
+          '<p>Сотрудник <strong>' + esc(u.name) + '</strong> больше не сможет войти в систему. Его заявки и история сохраняются.</p>',
+          '<button type="button" class="btn" data-close>Отмена</button>' +
+          '<button type="button" class="btn btn--danger" data-ok>Заблокировать</button>');
+        wireClose(root);
+        root.querySelector('[data-ok]').addEventListener('click', function () {
+          u.active = false;
+          saveUsers();
+          journalExtra.unshift({
+            at: nowISO(), who: user.login,
+            action: 'Блокировка сотрудника', object: u.name,
+            detail: 'Активен → Заблокирован'
+          });
+          saveJournalExtra();
+          renderStaff();
+          closeModal();
+        });
+      });
+    }
+    function unblock(login) {
+      var u = users.find(function (x) { return x.login === login; });
+      if (!u) return;
+      u.active = true;
+      saveUsers();
+      journalExtra.unshift({
+        at: nowISO(), who: user.login,
+        action: 'Разблокировка сотрудника', object: u.name,
+        detail: 'Заблокирован → Активен'
+      });
+      saveJournalExtra();
+      renderStaff();
+    }
+    $('#add-staff').addEventListener('click', openAdd);
+
+    function classify(a) {
+      if (/загрузк/i.test(a)) return 'import';
+      if (/создан/i.test(a)) return 'create';
+      if (/блокиров|разблокиров/i.test(a)) return 'staff';
+      if (/блокировка входа/i.test(a)) return 'auth';
+      if (/выбрал|выбор|закрыл|отмен|потерян|перевод.*статус|смен.*статус/i.test(a)) return 'status';
+      if (/изменил|изменение|редактир/i.test(a)) return 'edit';
+      return 'other';
+    }
+    function hideMoney(t) { return t && /₽|руб/i.test(t) ? 'Суммы скрыты для вашей роли' : t; }
+
+    var journalAll = [];
+    function rebuildJournalAll() {
+      journalAll = [];
+      (DATA.journal || []).forEach(function (j) {
+        journalAll.push({ at: j.at, who: j.who, action: j.action,
+          object: 'Заявка ' + j.orderId, detail: hideMoney(j.detail || ''), type: classify(j.action) });
+      });
+      journalExtra.forEach(function (j) {
+        journalAll.push({ at: j.at, who: j.who, action: j.action,
+          object: j.object || '', detail: j.detail || '', type: classify(j.action) });
+      });
+      journalAll.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
+    }
+    function renderJournalFilters() {
+      var p = $('#f-period'), w = $('#f-who'), t = $('#f-type');
+      if (!p.dataset.filled) {
+        p.innerHTML = '<option value="all">За всё время</option>' +
+          '<option value="today">Сегодня</option>' +
+          '<option value="week">7 дней</option>' +
+          '<option value="month">30 дней</option>';
+        p.dataset.filled = '1';
+      }
+      var prevWho = w.value;
+      var opts = [{ v: 'all', t: 'Все' }], seen = {};
+      journalAll.forEach(function (r) {
+        if (!seen[r.who]) { seen[r.who] = true; opts.push({ v: r.who, t: userName(r.who) }); }
+      });
+      w.innerHTML = opts.map(function (o) { return '<option value="' + esc(o.v) + '">' + esc(o.t) + '</option>'; }).join('');
+      if (prevWho && opts.some(function (o) { return o.v === prevWho; })) w.value = prevWho;
+      if (!t.dataset.filled) {
+        t.innerHTML = '<option value="all">Все</option>' +
+          '<option value="create">Создание</option>' +
+          '<option value="edit">Изменение</option>' +
+          '<option value="status">Смена статуса</option>' +
+          '<option value="import">Загрузка базы</option>' +
+          '<option value="staff">Сотрудники</option>' +
+          '<option value="auth">Авторизация</option>';
+        t.dataset.filled = '1';
+      }
+    }
+    function filterJournal() {
+      var p = $('#f-period').value, w = $('#f-who').value, t = $('#f-type').value;
+      var now = new Date(DATA.today + 'T23:59:59'), th = null;
+      if (p === 'today') { th = new Date(now); th.setHours(0, 0, 0, 0); }
+      else if (p === 'week') { th = new Date(now); th.setDate(th.getDate() - 7); }
+      else if (p === 'month') { th = new Date(now); th.setDate(th.getDate() - 30); }
+      return journalAll.filter(function (r) {
+        if (w !== 'all' && r.who !== w) return false;
+        if (t !== 'all' && r.type !== t) return false;
+        if (th && new Date(r.at) < th) return false;
+        return true;
+      });
+    }
+    function renderJournal() {
+      rebuildJournalAll();
+      renderJournalFilters();
+      var rows = filterJournal();
+      var tb = $('#journal-rows');
+      if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="5" class="journal-empty">За выбранный период записей нет</td></tr>';
+        return;
+      }
+      tb.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + esc(fmtDateTime(r.at)) + '</td>' +
+          '<td>' + esc(userName(r.who)) + '</td>' +
+          '<td>' + esc(r.action) + '</td>' +
+          '<td>' + esc(r.object) + '</td>' +
+          '<td>' + esc(r.detail || '—') + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+    ['#f-period', '#f-who', '#f-type'].forEach(function (s) {
+      var el = $(s); if (el) el.addEventListener('change', renderJournal);
+    });
+
+    renderCarriersUpdated();
+    renderImportsHistory();
+    renderStaff();
+    renderJournal();
+    switchTab('carriers');
+  })();
+  </script>
 </body>
 </html>
