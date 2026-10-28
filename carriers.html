@@ -8,20 +8,334 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/common.css">
+  <style>
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    .carriers-tools { display: flex; gap: 12px; flex-wrap: wrap; }
+    .search-field { position: relative; flex: 1 1 360px; max-width: 520px; }
+    .search-field svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); pointer-events: none; }
+    .search-field input, .carriers-tools select { height: 38px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); }
+    .search-field input { width: 100%; padding: 0 12px 0 38px; }
+    .carriers-tools select { min-width: 190px; padding: 0 32px 0 12px; }
+    .search-field input:hover, .carriers-tools select:hover { border-color: var(--dark); }
+    .list-card { padding: 0; overflow: hidden; }
+    .table-scroll { overflow-x: auto; }
+    .carriers-table { width: 100%; min-width: 900px; border-collapse: collapse; table-layout: fixed; }
+    .carriers-table th { padding: 11px 14px; background: var(--soft); color: var(--mute); font-size: 12px; font-weight: 600; text-align: left; }
+    .carriers-table th[data-sort] { cursor: pointer; }
+    .carriers-table td { padding: 13px 14px; border-top: 1px solid var(--line-2); vertical-align: middle; font-variant-numeric: tabular-nums; }
+    .carriers-table tbody tr { cursor: pointer; }
+    .carriers-table tbody tr:hover { background: #f8f8f8; }
+    .carriers-table tbody tr:focus-visible { outline-offset: -2px; }
+    .carrier-name { font-weight: 600; }
+    .cell-secondary { display: block; margin-top: 2px; color: var(--mute); font-size: 12px; }
+    .claims { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .claims::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+    .claims--good::before { background: var(--success); }
+    .claims--mid::before { background: var(--accent); }
+    .claims--bad::before { background: var(--danger); }
+    .empty-state { padding: 64px 24px; text-align: center; }
+    .empty-state h2 { margin-bottom: 6px; }
+    .empty-state p { margin: 0 auto; max-width: 52ch; color: var(--mute); }
+    .updated { color: var(--mute); font-size: 13px; }
+
+    .carrier-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .kv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0; border: 1px solid var(--line-2); border-radius: var(--radius); }
+    .kv { padding: 12px 14px; border-right: 1px solid var(--line-2); }
+    .kv:last-child { border-right: 0; }
+    .kv__label { color: var(--mute); font-size: 12px; }
+    .kv__value { margin-top: 2px; font-weight: 600; }
+    .card-section { display: flex; flex-direction: column; gap: 12px; }
+
+    @media (max-width: 720px) {
+      .carriers-tools { flex-direction: column; }
+      .search-field { flex-basis: auto; max-width: none; }
+      .carriers-tools select { width: 100%; }
+      .kv { border-right: 0; border-bottom: 1px solid var(--line-2); }
+      .kv:last-child { border-bottom: 0; }
+    }
+  </style>
 </head>
 <body data-page="carriers" data-roles="logist,manager">
   <header id="app-header"></header>
 
   <main class="page">
-    <div class="page-head">
-      <h1>Перевозчики</h1>
+    <!-- Список перевозчиков -->
+    <div id="list-view">
+      <div class="page" style="padding: 0; gap: 16px;">
+        <div class="page-head">
+          <div>
+            <h1>Перевозчики</h1>
+            <div class="updated" id="carriers-updated"></div>
+          </div>
+        </div>
+
+        <div class="carriers-tools" id="carriers-tools">
+          <label class="search-field">
+            <span class="visually-hidden">Поиск по названию, ИНН или телефону</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.75" stroke="#666" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="#666" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input id="carrier-search" type="search" placeholder="Название, ИНН или телефон" autocomplete="off">
+          </label>
+          <label>
+            <span class="visually-hidden">Фильтр по типу машины</span>
+            <select id="truck-filter"><option value="">Все типы машин</option></select>
+          </label>
+        </div>
+
+        <section class="card list-card" aria-label="Перевозчики из вашей базы">
+          <div class="table-scroll" id="table-wrap">
+            <table class="carriers-table">
+              <thead>
+                <tr>
+                  <th style="width: 24%">Перевозчик</th>
+                  <th style="width: 18%">Телефон</th>
+                  <th style="width: 20%">Типы машин</th>
+                  <th style="width: 10%" data-sort="trips" title="Сортировать по числу рейсов">Рейсов<span class="sort-mark"></span></th>
+                  <th style="width: 14%" data-sort="claims" title="Доля рейсов с претензиями. Сортировать">Претензии<span class="sort-mark"></span></th>
+                  <th style="width: 14%">Последний рейс</th>
+                </tr>
+              </thead>
+              <tbody id="carriers-body"></tbody>
+            </table>
+          </div>
+
+          <div class="empty-state" id="empty-filter" hidden>
+            <h2>Ничего не найдено</h2>
+            <p>Измените запрос или тип машины.</p>
+          </div>
+
+          <div class="empty-state" id="empty-base" hidden>
+            <h2>Перевозчиков пока нет</h2>
+            <p>Базу перевозчиков загружает администратор из файла CSV или XLSX. Пока она пустая, подбор ищет предложения только на ATI.SU.</p>
+          </div>
+        </section>
+      </div>
     </div>
 
-    <!-- Делает Ярослав. Figma: колонка 4.
-         Список перевозчиков, пустая база, карточка перевозчика. -->
+    <!-- Карточка перевозчика: carriers.html?id=1 -->
+    <div id="card-view" hidden>
+      <div class="page" style="padding: 0; gap: 16px;">
+        <nav id="crumbs"></nav>
+        <div class="carrier-head">
+          <h1 id="carrier-title">Перевозчик</h1>
+          <span class="badge badge--verified" id="carrier-verified" hidden>Проверенный</span>
+        </div>
+
+        <section class="card card-section" aria-labelledby="contacts-title">
+          <h3 id="contacts-title">Данные перевозчика</h3>
+          <div class="kv-grid">
+            <div class="kv"><div class="kv__label">ИНН</div><div class="kv__value" id="c-inn">-</div></div>
+            <div class="kv"><div class="kv__label">Телефон</div><div class="kv__value" id="c-phone">-</div></div>
+            <div class="kv"><div class="kv__label">Типы машин</div><div class="kv__value" id="c-types">-</div></div>
+            <div class="kv"><div class="kv__label">Источник</div><div class="kv__value">Наша база</div></div>
+          </div>
+        </section>
+
+        <section class="card card-section" aria-labelledby="stats-title">
+          <h3 id="stats-title">Работа с нашей компанией</h3>
+          <div class="kv-grid">
+            <div class="kv"><div class="kv__label">Выполнено рейсов</div><div class="kv__value" id="c-trips">-</div></div>
+            <div class="kv"><div class="kv__label">Рейсов с претензиями</div><div class="kv__value" id="c-claims">-</div></div>
+            <div class="kv"><div class="kv__label">Доля претензий</div><div class="kv__value" id="c-share">-</div></div>
+            <div class="kv"><div class="kv__label">Последний рейс</div><div class="kv__value" id="c-last">-</div></div>
+          </div>
+        </section>
+
+        <section class="card list-card" aria-labelledby="history-title">
+          <div style="padding: 14px 16px 12px;">
+            <h3 id="history-title">Заявки с этим перевозчиком</h3>
+            <div class="updated">История пополняется после каждой закрытой заявки</div>
+          </div>
+          <div class="table-scroll" id="history-wrap">
+            <table class="carriers-table" style="min-width: 640px;">
+              <thead>
+                <tr>
+                  <th style="width: 12%">№</th>
+                  <th style="width: 38%">Маршрут</th>
+                  <th style="width: 16%">Дата загрузки</th>
+                  <th style="width: 16%">Ставка</th>
+                  <th style="width: 18%">Статус</th>
+                </tr>
+              </thead>
+              <tbody id="history-body"></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="history-empty" hidden style="padding: 32px 24px;">
+            <p>Заявок с этим перевозчиком в системе пока нет.</p>
+          </div>
+        </section>
+      </div>
+    </div>
   </main>
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      // Для показа на защите: carriers.html?demo=empty — пустая база
+      var carriers = params.get('demo') === 'empty' ? [] : Exp.load('carriers').filter(function (c) { return c.source === 'own'; });
+      var esc = Exp.escapeHtml;
+      var sort = { key: null, dir: 'desc' };
+
+      var statusClass = {
+        new: 'status-chip--new', in_work: 'status-chip--in-work', carrier_chosen: 'status-chip--carrier',
+        closed: 'status-chip--closed', cancelled: 'status-chip--cancelled', lost: 'status-chip--lost'
+      };
+
+      function el(id) { return document.getElementById(id); }
+
+      // Доля рейсов с претензиями — сравнимый показатель вместо «хорошая / средняя / плохая»
+      function claimsInfo(c) {
+        var trips = Number(c.trips) || 0, claims = Number(c.claims) || 0;
+        if (!trips) return { share: null, text: 'нет истории', level: '' };
+        var share = claims / trips;
+        var level = claims === 0 ? 'good' : share <= 0.15 ? 'mid' : 'bad';
+        var pct = Math.round(share * 1000) / 10;
+        return { share: share, text: pct.toLocaleString('ru-RU') + '% · ' + claims + ' из ' + trips, level: level };
+      }
+
+      function dateTime(iso) {
+        return Exp.date(iso) + (iso.length > 10 ? ' ' + iso.slice(11, 16) : '');
+      }
+
+      function updatedAt() {
+        var imports = null;
+        try { imports = JSON.parse(localStorage.getItem('exp_admin_imports')); } catch (e) { }
+        var last = imports && imports.length ? imports[0].at : DATA.carriersUpdatedAt;
+        return last ? 'Данные обновлены: ' + dateTime(last) : '';
+      }
+
+      /* ---------- список ---------- */
+      function filtered() {
+        var q = el('carrier-search').value.trim().toLowerCase();
+        var type = el('truck-filter').value;
+        var list = carriers.filter(function (c) {
+          var hay = (c.name + ' ' + (c.inn || '') + ' ' + (c.phone || '')).toLowerCase();
+          return (!q || hay.indexOf(q) !== -1) && (!type || (c.truckTypes || []).indexOf(type) !== -1);
+        });
+        if (sort.key) {
+          var val = sort.key === 'trips'
+            ? function (c) { return Number(c.trips) || 0; }
+            // Без истории — в конец списка при любом направлении
+            : function (c) { var s = claimsInfo(c).share; return s === null ? (sort.dir === 'asc' ? 2 : -1) : s; };
+          var k = sort.dir === 'asc' ? 1 : -1;
+          list = list.slice().sort(function (a, b) { return k * (val(a) - val(b)); });
+        }
+        return list;
+      }
+
+      function rowHtml(c) {
+        var ci = claimsInfo(c);
+        return '<tr tabindex="0" data-id="' + c.id + '" aria-label="Открыть карточку: ' + esc(c.name) + '">' +
+          '<td><span class="carrier-name">' + esc(c.name) + '</span>' +
+            '<span class="cell-secondary">' + (c.inn ? 'ИНН ' + esc(c.inn) : 'ИНН не указан') + '</span></td>' +
+          '<td style="white-space: nowrap;">' + esc(c.phone || 'нет данных') + '</td>' +
+          '<td>' + esc((c.truckTypes || []).join(', ')) + '</td>' +
+          '<td>' + (Number(c.trips) || 0) + '</td>' +
+          '<td><span class="claims' + (ci.level ? ' claims--' + ci.level : '') + '">' + esc(ci.text) + '</span></td>' +
+          '<td>' + (c.lastTrip ? Exp.date(c.lastTrip) : '—') + '</td>' +
+        '</tr>';
+      }
+
+      function renderList() {
+        var list = filtered();
+        el('carriers-body').innerHTML = list.map(rowHtml).join('');
+        el('table-wrap').hidden = !list.length;
+        el('empty-base').hidden = carriers.length > 0;
+        el('empty-filter').hidden = !carriers.length || list.length > 0;
+        el('carriers-tools').hidden = !carriers.length;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-sort]'), function (th) {
+          var on = th.getAttribute('data-sort') === sort.key;
+          th.setAttribute('aria-sort', on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+          th.querySelector('.sort-mark').textContent = on ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+        });
+      }
+
+      function initList() {
+        el('carriers-updated').textContent = carriers.length ? updatedAt() : '';
+        var types = [];
+        carriers.forEach(function (c) { (c.truckTypes || []).forEach(function (t) { if (types.indexOf(t) === -1) types.push(t); }); });
+        DATA.truckTypes.concat(types).filter(function (t, i, all) { return all.indexOf(t) === i && types.indexOf(t) !== -1; })
+          .forEach(function (t) {
+            var o = document.createElement('option');
+            o.value = t; o.textContent = t;
+            el('truck-filter').appendChild(o);
+          });
+
+        el('carrier-search').addEventListener('input', renderList);
+        el('truck-filter').addEventListener('change', renderList);
+        Array.prototype.forEach.call(document.querySelectorAll('[data-sort]'), function (th) {
+          th.addEventListener('click', function () {
+            var key = th.getAttribute('data-sort');
+            // Рейсы — от большего, претензии — от меньшей доли
+            if (sort.key === key) sort.dir = sort.dir === 'asc' ? 'desc' : 'asc';
+            else sort.dir = key === 'trips' ? 'desc' : 'asc';
+            sort.key = key;
+            renderList();
+          });
+        });
+
+        function open(row) { location.href = 'carriers.html?id=' + row.getAttribute('data-id'); }
+        el('carriers-body').addEventListener('click', function (e) {
+          var row = e.target.closest('tr'); if (row) open(row);
+        });
+        el('carriers-body').addEventListener('keydown', function (e) {
+          var row = e.target.closest('tr');
+          if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(row); }
+        });
+        renderList();
+      }
+
+      /* ---------- карточка ---------- */
+      function initCard(id) {
+        var c = Exp.load('carriers').filter(function (x) { return x.id === id; })[0];
+        el('list-view').hidden = true;
+        el('card-view').hidden = false;
+        if (!c) {
+          Exp.crumbs([['Перевозчики', 'carriers.html'], ['Перевозчик не найден']]);
+          el('carrier-title').textContent = 'Перевозчик не найден';
+          Array.prototype.forEach.call(document.querySelectorAll('#card-view section'), function (s) { s.hidden = true; });
+          return;
+        }
+        Exp.crumbs([['Перевозчики', 'carriers.html'], [c.name]]);
+        document.title = c.name + ' — Экспедитор';
+        var ci = claimsInfo(c);
+        el('carrier-title').textContent = c.name;
+        // Как в подборе: «Проверенный» — от 5 рейсов и доля претензий не больше 15%
+        el('carrier-verified').hidden = !((Number(c.trips) || 0) >= 5 && ci.level !== 'bad');
+        el('c-inn').textContent = c.inn || 'не указан';
+        el('c-phone').textContent = c.phone || 'нет данных';
+        el('c-types').textContent = (c.truckTypes || []).join(', ') || 'нет данных';
+        el('c-trips').textContent = String(Number(c.trips) || 0);
+        el('c-claims').textContent = c.trips ? String(Number(c.claims) || 0) : 'нет данных';
+        el('c-share').textContent = ci.share === null ? 'нет истории' : ci.text.split(' · ')[0];
+        el('c-last').textContent = c.lastTrip ? Exp.date(c.lastTrip) : 'рейсов ещё не было';
+
+        var orders = Exp.load('orders').filter(function (o) { return o.carrierId === c.id; })
+          .sort(function (a, b) { return a.loadDate < b.loadDate ? 1 : -1; });
+        el('history-body').innerHTML = orders.map(function (o) {
+          return '<tr tabindex="0" data-order="' + o.id + '" aria-label="Открыть заявку №' + o.id + '">' +
+            '<td>' + o.id + '</td>' +
+            '<td><span class="carrier-name">' + esc(o.from + ' → ' + o.to) + '</span></td>' +
+            '<td>' + Exp.date(o.loadDate) + '</td>' +
+            '<td>' + (o.carrierRate ? Exp.money(o.carrierRate) : '—') + '</td>' +
+            '<td><span class="status-chip ' + (statusClass[o.status] || '') + '">' + esc(DATA.statuses[o.status]) + '</span></td>' +
+          '</tr>';
+        }).join('');
+        el('history-wrap').hidden = !orders.length;
+        el('history-empty').hidden = orders.length > 0;
+        el('history-body').addEventListener('click', function (e) {
+          var row = e.target.closest('tr'); if (row) location.href = 'order.html?id=' + row.getAttribute('data-order');
+        });
+        el('history-body').addEventListener('keydown', function (e) {
+          var row = e.target.closest('tr');
+          if (row && e.key === 'Enter') location.href = 'order.html?id=' + row.getAttribute('data-order');
+        });
+      }
+
+      var id = Number(params.get('id'));
+      if (id) initCard(id); else initList();
+    })();
+  </script>
 </body>
 </html>

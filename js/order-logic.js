@@ -39,7 +39,8 @@
   function find(orders, id) {
     return orders.filter(function (o) { return String(o.id) === String(id); })[0] || null;
   }
-  function canAct() { return !!(Exp.user && Exp.user.role === 'logist'); }
+  // Руководитель может вести заявку как логист, например когда логист заболел (US-13)
+  function canAct() { return !!(Exp.user && (Exp.user.role === 'logist' || Exp.user.role === 'manager')); }
   function statusName(code) { return DATA.statuses[code]; }
 
   function addJournal(orderId, who, action, detail) {
@@ -176,7 +177,7 @@
 
   /* ---------- действия ---------- */
   function guard(orderId, allowed) {
-    if (!canAct()) return { ok: false, error: 'Менять заявки может только логист' };
+    if (!canAct()) return { ok: false, error: 'Менять заявки могут только логист и руководитель' };
     var orders = Exp.load('orders'), order = find(orders, orderId);
     if (!order) return { ok: false, error: 'Заявка не найдена' };
     if (allowed.indexOf(order.status) < 0)

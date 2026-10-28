@@ -38,8 +38,9 @@
     try { localStorage.removeItem(key); } catch (e) { }
   }
 
+  // Сотрудников ведёт администратор, поэтому берём сохранённый список, а не только data.js
   function findUser(login) {
-    return DATA.users.find(function (u) { return u.login === login; }) || null;
+    return load('users').find(function (u) { return u.login === login; }) || null;
   }
 
   function currentUser() {

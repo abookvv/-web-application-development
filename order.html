@@ -318,6 +318,8 @@
       </div>
     </section>
 
+    <div id="card-message" role="status" aria-live="polite" hidden></div>
+
     <section class="order-progress" aria-label="Этапы заявки">
       <div class="order-progress__step" data-progress="new">
         <span class="order-progress__dot">1</span>
@@ -336,6 +338,8 @@
         <span class="order-progress__label">Закрыта</span>
       </div>
     </section>
+
+    <p class="muted" id="order-final-note" hidden></p>
 
     <section class="card" aria-labelledby="order-info-title">
       <div class="section-title">
@@ -421,9 +425,9 @@
                 <tr>
                   <th style="width: 18%">Перевозчик</th>
                   <th style="width: 11%">Источник</th>
-                  <th style="width: 10%">Ставка</th>
-                  <th style="width: 8%">Рейтинг</th>
-                  <th style="width: 14%">Репутация</th>
+                  <th style="width: 10%; cursor: pointer;" data-sort="rate" title="Сортировать по ставке">Ставка<span class="sort-mark"></span></th>
+                  <th style="width: 8%; cursor: pointer;" data-sort="rating" title="Сортировать по рейтингу">Рейтинг<span class="sort-mark"></span></th>
+                  <th style="width: 14%" title="Доля рейсов с претензиями: сколько рейсов из выполненных закончились претензией">Претензии</th>
                   <th style="width: 10%">Тип машины</th>
                   <th style="width: 15%">Метки</th>
                   <th style="width: 14%">Действия</th>
@@ -440,8 +444,7 @@
             <h2>Подходящих предложений не нашлось</h2>
             <p>Ни на ATI.SU, ни в вашей базе нет перевозчиков под эту заявку. Измените тип машины, вес или дату загрузки и попробуйте снова.</p>
             <div class="empty-state__actions">
-              <button class="btn" type="button">Редактировать заявку</button>
-              <button class="btn btn--primary" type="button" data-show-state="results">Подобрать заново</button>
+              <button class="btn btn--primary" type="button" id="empty-repeat-btn">Подобрать заново</button>
             </div>
           </div>
         </div>
@@ -464,6 +467,9 @@
               <div class="selected-summary__label">Маржа</div>
               <div class="selected-summary__value" id="selected-margin">-</div>
             </div>
+          </div>
+          <div class="empty-state__actions" style="justify-content: flex-end; margin-top: 16px;">
+            <button class="btn btn--primary" type="button" id="close-order-btn">Закрыть заявку</button>
           </div>
         </div>
       </div>
@@ -542,6 +548,7 @@
           <span class="field__label">Ставка перевозчика, ₽</span>
           <input class="field__control" id="choose-rate" type="number" min="1" step="1000">
           <span class="field__hint">Можно изменить, если договорились о другой сумме</span>
+          <span class="field__error" id="choose-rate-error"></span>
         </label>
 
         <div class="margin-box" id="choose-margin-box">
@@ -607,16 +614,19 @@
 
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
-  <!-- <script src="js/order-logic.js"></script> подключить, когда Анна пришлет файл -->
+  <script src="js/order-logic.js"></script>
 
   <script>
+    // Карточка заявки: вёрстка — Таисия, данные и действия — js/order-logic.js (window.OrderLogic)
     (function () {
       var params = new URLSearchParams(location.search);
       var id = Number(params.get('id'));
-      var previewState = params.get('state');
-      var orders = Exp.load('orders');
-      var carriers = Exp.load('carriers');
-      var order = orders.find(function (o) { return o.id === id; });
+      // Для показа на защите: order.html?id=1024&demo=ati — биржа недоступна, &demo=empty — предложений нет
+      if (params.get('demo') === 'ati') OrderLogic.demo.atiDown = true;
+      if (params.get('demo') === 'empty') OrderLogic.demo.empty = true;
+      var sortState = { key: 'rating', dir: 'desc' };
+      var activeOfferKey = null;
+      var view = OrderLogic.view(id);
 
       var statusClass = {
         new: 'status-chip--new',
@@ -627,57 +637,14 @@
         lost: 'status-chip--lost'
       };
 
-      var progressOrder = ['new', 'in_work', 'carrier_chosen', 'closed'];
+      var BADGES = {
+        'Рекомендуем': 'badge--recommended',
+        'Проверенный': 'badge--verified',
+        'Самый дешёвый': 'badge--cheapest'
+      };
 
-      /*
-        В data.js пока нет отдельного массива offers.
-        Это временные демонстрационные предложения для верстки колонки 3.
-        order-logic.js сможет заменить их реальными данными без изменения HTML/CSS.
-      */
-      var DEMO_OFFERS = [
-        {
-          id: 'offer-1', carrierId: 1, name: 'ТрансЛогистик', source: 'ati',
-          rate: 75000, rating: 90, truckType: 'Тент',
-          rep: 'Хорошая · 0 из 15', repClass: 'good',
-          badges: ['recommended', 'cheapest'],
-          score: { cost: 35, experience: 15, reputation: 30, truck: 10 }
-        },
-        {
-          id: 'offer-2', carrierId: 4, name: 'ИП Сидоров А. В.', source: 'own',
-          rate: 82000, rating: 77, truckType: 'Тент',
-          rep: 'Средняя · 1 из 10', repClass: 'mid',
-          badges: ['verified'],
-          score: { cost: 22, experience: 12, reputation: 25, truck: 18 }
-        },
-        {
-          id: 'offer-3', carrierId: 3, name: 'ООО «Балт-Экспресс»', source: 'own',
-          rate: 79000, rating: 64, truckType: 'Тент',
-          rep: 'Средняя · 1 из 12', repClass: 'mid',
-          badges: [],
-          score: { cost: 27, experience: 10, reputation: 17, truck: 10 }
-        },
-        {
-          id: 'offer-4', carrierId: 5, name: 'ООО «Волга-Транзит»', source: 'ati',
-          rate: 90000, rating: 57, truckType: 'Тент',
-          rep: 'Плохая · 2 из 8', repClass: 'bad',
-          badges: [],
-          score: { cost: 12, experience: 10, reputation: 15, truck: 20 }
-        },
-        {
-          id: 'offer-5', carrierId: 6, name: 'ИП Назаров Д. К.', source: 'ati',
-          rate: 90000, rating: 53, truckType: 'Тент',
-          rep: 'Плохая · 1 из 5', repClass: 'bad',
-          badges: [],
-          score: { cost: 12, experience: 8, reputation: 13, truck: 20 }
-        },
-        {
-          id: 'offer-6', carrierId: 7, name: 'ООО «Рефтранс-Норд»', source: 'ati',
-          rate: 81000, rating: 47, truckType: 'Изотерм',
-          rep: 'Плохая · 2 из 5', repClass: 'bad',
-          badges: [],
-          score: { cost: 24, experience: 7, reputation: 11, truck: 5 }
-        }
-      ];
+      function el(id) { return document.getElementById(id); }
+      function escape(value) { return Exp.escapeHtml(value == null ? '' : value); }
 
       function pawIcon() {
         return '<svg class="paw-icon" viewBox="0 0 24 24" aria-hidden="true">' +
@@ -689,15 +656,20 @@
         '</svg>';
       }
 
-      function escape(value) {
-        return Exp.escapeHtml(value == null ? '' : value);
+      // Сообщение над карточкой: успех действия или ошибка из OrderLogic
+      function message(text, kind) {
+        var box = el('card-message');
+        if (!text) { box.hidden = true; return; }
+        box.className = 'alert alert--' + (kind || 'success');
+        box.innerHTML = '<span class="alert__icon">' + (kind === 'danger' ? '!' : '✓') + '</span><div>' + escape(text) + '</div>';
+        box.hidden = false;
       }
 
-      function badgeHtml(code) {
-        if (code === 'recommended') return '<span class="badge badge--recommended">Рекомендовано</span>';
-        if (code === 'cheapest') return '<span class="badge badge--cheapest">Самый дешевый</span>';
-        if (code === 'verified') return '<span class="badge badge--verified">Проверенный</span>';
-        return '';
+      // Доля рейсов с претензиями вместо «хорошая / средняя / плохая» — так репутации сравнимы между собой
+      function repText(rep, offer) {
+        if (rep.share === null) return 'нет истории';
+        var pct = Math.round(rep.share * 1000) / 10;
+        return pct.toLocaleString('ru-RU') + '% · ' + (offer.claims || 0) + ' из ' + offer.trips;
       }
 
       function ratingClass(value) {
@@ -708,393 +680,339 @@
 
       function sourceHtml(offer) {
         if (offer.source === 'own') {
-          return '<span class="own-source" title="Перевозчик из вашей базы">' +
-            pawIcon() + '<span>Наша база</span></span>';
+          return '<span class="own-source" title="Перевозчик из вашей базы">' + pawIcon() + '<span>Наша база</span></span>';
         }
         return '<span class="muted" style="font-size:12px;">ATI.SU</span>';
       }
 
       function offerHtml(offer) {
-        var rowClass = offer.badges.indexOf('recommended') !== -1
-          ? ' class="data-table__row--recommended"'
+        var recommended = offer.badges.indexOf('Рекомендуем') !== -1;
+        var choose = view.can.choose
+          ? '<button class="btn btn--primary btn--sm" type="button" data-choose-offer="' + offer.key + '">Выбрать</button>'
           : '';
-
-        return '<tr' + rowClass + ' data-offer-id="' + offer.id + '">' +
+        return '<tr' + (recommended ? ' class="data-table__row--recommended"' : '') + '>' +
           '<td><span class="carrier-name">' + escape(offer.name) + '</span></td>' +
           '<td>' + sourceHtml(offer) + '</td>' +
           '<td><strong>' + Exp.money(offer.rate) + '</strong></td>' +
-          '<td><span class="' + ratingClass(offer.rating) + '">' + offer.rating + '</span></td>' +
-          '<td><span class="rep rep--' + offer.repClass + '">' + escape(offer.rep) + '</span></td>' +
+          '<td><span class="' + ratingClass(offer.rating.total) + '">' + offer.rating.total + '</span></td>' +
+          '<td><span class="rep rep--' + offer.reputation.level + '">' + escape(repText(offer.reputation, offer)) + '</span></td>' +
           '<td>' + escape(offer.truckType) + '</td>' +
-          '<td><div class="badges">' + offer.badges.map(badgeHtml).join('') + '</div></td>' +
+          '<td><div class="badges">' + offer.badges.map(function (b) {
+            return '<span class="badge ' + BADGES[b] + '">' + escape(b) + '</span>';
+          }).join('') + '</div></td>' +
           '<td><div class="table-actions">' +
-            '<button class="table-link" type="button" data-carrier-popover="' + offer.id + '">О перевозчике</button>' +
-            '<button class="table-link" type="button" data-rating-popover="' + offer.id + '">Как посчитан рейтинг</button>' +
-            '<button class="btn btn--primary btn--sm" type="button" data-choose-offer="' + offer.id + '">Выбрать</button>' +
+            '<button class="table-link" type="button" data-carrier-popover="' + offer.key + '">О перевозчике</button>' +
+            '<button class="table-link" type="button" data-rating-popover="' + offer.key + '">Как посчитан рейтинг</button>' +
+            choose +
           '</div></td>' +
         '</tr>';
       }
 
-      function renderOffers(ownOnly) {
-        var rows = ownOnly
-          ? DEMO_OFFERS.filter(function (o) { return o.source === 'own'; })
-          : DEMO_OFFERS;
-
-        document.getElementById('offers-body').innerHTML = rows.map(offerHtml).join('');
-        document.getElementById('matching-meta').textContent =
-          'Найдено предложений: ' + rows.length + ' · Лучшие по рейтингу показаны первыми';
-
-        bindOfferActions();
+      function offerByKey(key) {
+        return view.offers.filter(function (o) { return o.key === key; })[0] || null;
       }
 
-      function setStatus(status) {
-        var chip = document.getElementById('order-status');
-        chip.className = 'status-chip ' + (statusClass[status] || '');
-        chip.textContent = DATA.statuses[status] || status;
-
-        var activeIndex = progressOrder.indexOf(status);
-        if (status === 'lost' || status === 'cancelled') activeIndex = 1;
-
-        Array.prototype.forEach.call(document.querySelectorAll('[data-progress]'), function (step, index) {
-          step.classList.toggle('is-done', index < activeIndex);
-          step.classList.toggle('is-active', index === activeIndex);
+      function renderOffers() {
+        var list = OrderLogic.sortOffers(view.offers, sortState.key, sortState.dir);
+        el('offers-body').innerHTML = list.map(offerHtml).join('');
+        el('matching-meta').textContent = view.offersSummary;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-sort]'), function (th) {
+          var on = th.getAttribute('data-sort') === sortState.key;
+          th.setAttribute('aria-sort', on ? (sortState.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+          th.querySelector('.sort-mark').textContent = on ? (sortState.dir === 'asc' ? ' ↑' : ' ↓') : '';
         });
       }
 
-      function hideMatchingStates() {
-        ['matching-new', 'matching-loading', 'matching-results', 'matching-empty', 'matching-selected']
-          .forEach(function (name) {
-            document.getElementById(name).hidden = true;
+      function setStatus() {
+        var st = view.order.status;
+        var chip = el('order-status');
+        chip.className = 'status-chip ' + (statusClass[st] || '');
+        chip.textContent = view.statusLabel;
+
+        // У отменённых и потерянных шкалы нет: вместо неё строка с причиной
+        var progress = document.querySelector('.order-progress');
+        progress.hidden = !view.steps;
+        if (view.steps) {
+          view.steps.forEach(function (step) {
+            var node = document.querySelector('[data-progress="' + step.code + '"]');
+            node.classList.toggle('is-done', step.state === 'done');
+            node.classList.toggle('is-active', step.state === 'current');
           });
+        }
+        var note = el('order-final-note');
+        if (st === 'lost') {
+          note.textContent = 'Заявка потеряна. Причина: ' + view.order.lossReason;
+        } else if (st === 'cancelled') {
+          note.textContent = 'Заявка отменена. В показателях потерь не учитывается.';
+        }
+        note.hidden = st !== 'lost' && st !== 'cancelled';
 
-        document.getElementById('ati-warning').hidden = true;
+        el('edit-order-btn').hidden = !view.can.edit;
+        el('cancel-order-btn').hidden = !view.can.cancel;
+        el('lost-order-btn').hidden = !view.can.lost;
       }
 
-      function showMatchingState(state) {
-        hideMatchingStates();
+      function showMatching() {
+        ['matching-new', 'matching-loading', 'matching-results', 'matching-empty', 'matching-selected'].forEach(function (name) {
+          el(name).hidden = true;
+        });
+        el('ati-warning').hidden = true;
+        el('repeat-match-btn').hidden = !(view.can.search && view.hasSearched);
+        el('start-match-btn').hidden = !view.can.search;
 
-        if (state === 'new') {
-          document.getElementById('matching-new').hidden = false;
-          document.getElementById('repeat-match-btn').hidden = true;
+        // Отменённая или потерянная заявка без подбора: блок подбора не нужен
+        document.querySelector('.matching-card').hidden = !view.hasSearched && !view.can.search && !view.chosen;
+
+        if (view.searching) { el('matching-loading').hidden = false; return; }
+
+        if (view.chosen) {
+          el('matching-selected').hidden = false;
+          // У демо-заявок из data.js нет названия перевозчика, только carrierId из базы
+          var carrier = Exp.load('carriers').filter(function (c) { return c.id === view.order.carrierId; })[0];
+          var name = view.chosen.name || (carrier ? carrier.name : 'Перевозчик');
+          el('selected-carrier').textContent = name + ' · ' + (view.chosen.name ? view.chosen.sourceLabel : 'Наша база');
+          el('selected-client-rate').textContent = Exp.money(view.chosen.clientRate);
+          el('selected-carrier-rate').textContent = Exp.money(view.chosen.carrierRate);
+          el('selected-margin').textContent = (view.margin.value > 0 ? '+' : '') + Exp.money(view.margin.value) + ' · ' +
+            view.margin.pct.toLocaleString('ru-RU') + '%';
+          el('close-order-btn').hidden = !view.can.close;
+          el('matching-meta').textContent = 'Предложений при подборе: ' + view.chosen.offersCount;
           return;
         }
 
-        if (state === 'loading') {
-          document.getElementById('matching-loading').hidden = false;
-          document.getElementById('repeat-match-btn').hidden = true;
+        if (!view.hasSearched) {
+          el('matching-new').hidden = false;
+          el('matching-meta').textContent = 'Предложения по заявке';
           return;
         }
 
-        if (state === 'empty') {
-          document.getElementById('matching-empty').hidden = false;
-          document.getElementById('repeat-match-btn').hidden = false;
+        if (view.empty) {
+          el('matching-empty').hidden = false;
+          el('matching-meta').textContent = 'Найдено предложений: 0';
           return;
         }
 
-        if (state === 'selected') {
-          document.getElementById('matching-selected').hidden = false;
-          document.getElementById('repeat-match-btn').hidden = false;
-          fillSelectedCarrier();
-          return;
-        }
-
-        document.getElementById('matching-results').hidden = false;
-        document.getElementById('repeat-match-btn').hidden = false;
-
-        var atiError = state === 'ati-error';
-        document.getElementById('ati-warning').hidden = !atiError;
-        renderOffers(atiError);
+        el('matching-results').hidden = false;
+        el('ati-warning').hidden = !view.atiUnavailable;
+        renderOffers();
       }
 
-      function defaultMatchingState() {
-        if (!order) return 'empty';
-        if (previewState) return previewState;
-        if (order.status === 'new') return 'new';
-        if (order.status === 'carrier_chosen' || order.status === 'closed') return 'selected';
-        return 'results';
+      function render() {
+        view = OrderLogic.view(id);
+        var o = view.order;
+        var route = o.from + ' → ' + o.to;
+        Exp.crumbs([['Заявки', 'orders.html'], [route]]);
+        el('order-title').textContent = route;
+        document.title = route + ' — Экспедитор';
+        el('order-from').textContent = o.from;
+        el('order-to').textContent = o.to;
+        el('order-load-date').textContent = Exp.date(o.loadDate);
+        el('order-truck-type').textContent = o.truckType;
+        el('order-weight').textContent = o.weightT + ' т';
+        el('order-client-rate').textContent = Exp.money(o.clientRate);
+        el('order-cargo').textContent = o.cargo || o.notes || 'нет данных';
+        setStatus();
+        showMatching();
       }
 
-      function fillSelectedCarrier() {
-        if (!order) return;
-
-        var carrier = carriers.find(function (c) { return c.id === order.carrierId; });
-        var carrierRate = Number(order.carrierRate || 0);
-        var margin = Number(order.clientRate || 0) - carrierRate;
-
-        document.getElementById('selected-carrier').textContent =
-          carrier ? carrier.name : 'Не выбран';
-
-        document.getElementById('selected-client-rate').textContent =
-          Exp.money(order.clientRate || 0);
-
-        document.getElementById('selected-carrier-rate').textContent =
-          carrierRate ? Exp.money(carrierRate) : 'нет данных';
-
-        document.getElementById('selected-margin').textContent =
-          carrierRate ? Exp.money(margin) : 'нет данных';
+      function runSearch() {
+        message('');
+        var promise = OrderLogic.search(id);
+        render(); // view.searching = true → «Идёт подбор…»
+        promise.then(function (res) {
+          if (!res.ok) message(res.error, 'danger');
+          render();
+        });
       }
 
+      /* ---------- поповеры ---------- */
       function placePopover(popover, anchor) {
         var rect = anchor.getBoundingClientRect();
         popover.hidden = false;
-
         var width = popover.offsetWidth;
         var height = popover.offsetHeight;
         var left = Math.min(rect.left, window.innerWidth - width - 16);
         var top = rect.bottom + 8;
-
-        if (top + height > window.innerHeight - 16) {
-          top = Math.max(16, rect.top - height - 8);
-        }
-
+        if (top + height > window.innerHeight - 16) top = Math.max(16, rect.top - height - 8);
         popover.style.left = Math.max(16, left) + 'px';
         popover.style.top = top + 'px';
       }
 
       function closePopovers() {
-        document.getElementById('rating-popover').hidden = true;
-        document.getElementById('carrier-popover').hidden = true;
-      }
-
-      function carrierByOffer(offer) {
-        return carriers.find(function (c) { return c.id === offer.carrierId; }) || null;
-      }
-
-      function reputationText(carrier) {
-        if (!carrier || !carrier.trips) return 'нет данных';
-        var ratio = carrier.claims / carrier.trips;
-        if (ratio === 0) return 'Хорошая';
-        if (ratio <= 0.12) return 'Средняя';
-        return 'Плохая';
+        el('rating-popover').hidden = true;
+        el('carrier-popover').hidden = true;
       }
 
       function openCarrierPopover(offer, anchor) {
-        var carrier = carrierByOffer(offer);
-
-        document.getElementById('carrier-popover-title').textContent = offer.name;
-        document.getElementById('carrier-popover-source').innerHTML =
-          offer.source === 'own' ? pawIcon() + ' Наша база' : 'ATI.SU';
-
-        document.getElementById('carrier-phone').textContent =
-          carrier && carrier.phone ? carrier.phone : 'нет данных';
-
-        document.getElementById('carrier-trips').textContent =
-          carrier ? String(carrier.trips) : 'нет данных';
-
-        document.getElementById('carrier-last-trip').textContent =
-          carrier && carrier.lastTrip ? Exp.date(carrier.lastTrip) : 'нет данных';
-
-        document.getElementById('carrier-claims').textContent =
-          carrier && carrier.trips ? String(carrier.claims) : 'нет данных';
-
-        document.getElementById('carrier-reputation').textContent =
-          reputationText(carrier);
-
-        document.getElementById('carrier-inn').textContent =
-          carrier && carrier.inn ? carrier.inn : 'нет данных';
-
+        var info = OrderLogic.carrierInfo(offer);
+        el('carrier-popover-title').textContent = info.name;
+        el('carrier-popover-source').innerHTML = offer.source === 'own' ? pawIcon() + ' Наша база' : 'ATI.SU';
+        el('carrier-phone').textContent = info.phone || 'нет данных';
+        el('carrier-trips').textContent = info.trips ? String(info.trips) : 'нет истории';
+        el('carrier-last-trip').textContent = info.lastTrip ? Exp.date(info.lastTrip) : 'нет данных';
+        el('carrier-claims').textContent = info.trips ? String(info.claims) : 'нет данных';
+        el('carrier-reputation').textContent = repText(info.reputation, offer);
+        el('carrier-inn').textContent = info.inn || 'нет данных';
         closePopovers();
-        placePopover(document.getElementById('carrier-popover'), anchor);
+        placePopover(el('carrier-popover'), anchor);
       }
 
       function openRatingPopover(offer, anchor) {
-        var carrier = carrierByOffer(offer);
-        var score = offer.score;
-
-        document.getElementById('rating-popover-carrier').textContent = offer.name;
-
-        document.getElementById('rating-cost-value').textContent =
-          Exp.money(offer.rate);
-        document.getElementById('rating-cost-points').textContent =
-          '+' + score.cost;
-
-        document.getElementById('rating-exp-value').textContent =
-          carrier && carrier.trips ? carrier.trips + ' рейсов' : 'нет данных';
-        document.getElementById('rating-exp-points').textContent =
-          '+' + score.experience;
-
-        document.getElementById('rating-rep-value').textContent =
-          offer.rep;
-        document.getElementById('rating-rep-points').textContent =
-          '+' + score.reputation;
-
-        document.getElementById('rating-truck-value').textContent =
-          offer.truckType + (offer.truckType === order.truckType ? ' · совпадает' : ' · не совпадает');
-        document.getElementById('rating-truck-points').textContent =
-          '+' + score.truck;
-
-        document.getElementById('rating-total').textContent =
-          'Итого: ' + offer.rating;
-
+        var R = OrderLogic.CFG.RATING, p = offer.rating.parts;
+        var typeOk = !offer.truckTypes || offer.truckTypes.indexOf(view.order.truckType) >= 0;
+        el('rating-popover-carrier').textContent = offer.name;
+        el('rating-cost-value').textContent = Exp.money(offer.rate);
+        el('rating-cost-points').textContent = p.cost + ' из ' + R.COST;
+        el('rating-exp-value').textContent = offer.trips ? offer.trips + ' рейсов' : 'нет истории';
+        el('rating-exp-points').textContent = p.experience + ' из ' + R.EXP;
+        el('rating-rep-value').textContent = repText(offer.reputation, offer);
+        el('rating-rep-points').textContent = p.reputation + ' из ' + R.REP;
+        el('rating-truck-value').textContent = offer.truckType + (typeOk ? ' · совпадает' : ' · не совпадает');
+        el('rating-truck-points').textContent = p.type + ' из ' + R.TYPE;
+        el('rating-total').textContent = 'Итого: ' + offer.rating.total + ' из 100';
         closePopovers();
-        placePopover(document.getElementById('rating-popover'), anchor);
+        placePopover(el('rating-popover'), anchor);
       }
 
-      var activeOffer = null;
-
-      function updateMargin() {
-        if (!order || !activeOffer) return;
-
-        var rate = Number(document.getElementById('choose-rate').value || 0);
-        var margin = Number(order.clientRate) - rate;
-        var percent = order.clientRate ? margin / order.clientRate * 100 : 0;
-        var negative = margin <= 0;
-
-        document.getElementById('choose-margin').textContent =
-          Exp.money(margin);
-
-        document.getElementById('choose-margin-percent').textContent =
-          percent.toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + '% от ставки клиента';
-
-        document.getElementById('choose-margin-box')
-          .classList.toggle('margin-box--negative', negative);
-
-        document.getElementById('negative-margin-alert').hidden = !negative;
-
-        var button = document.getElementById('confirm-carrier-btn');
-        button.textContent =
-          negative ? 'Все равно подтвердить' : 'Подтвердить выбор';
-
-        button.classList.toggle('btn--primary', !negative);
-        button.classList.toggle('btn--danger', negative);
-      }
-
-      function openChooseModal(offer) {
-        activeOffer = offer;
-
-        document.getElementById('choose-carrier-name').textContent =
-          offer.name;
-
-        document.getElementById('choose-client-rate').textContent =
-          Exp.money(order.clientRate);
-
-        document.getElementById('choose-rate').value =
-          offer.rate;
-
-        document.getElementById('choose-modal').hidden = false;
-
-        updateMargin();
-      }
-
+      /* ---------- окна ---------- */
       function closeModals() {
         Array.prototype.forEach.call(document.querySelectorAll('.modal-backdrop'), function (modal) {
           modal.hidden = true;
         });
       }
 
-      function bindOfferActions() {
-        Array.prototype.forEach.call(document.querySelectorAll('[data-carrier-popover]'), function (button) {
-          button.addEventListener('click', function () {
-            var offer = DEMO_OFFERS.find(function (o) {
-              return o.id === button.getAttribute('data-carrier-popover');
-            });
+      function updateMargin() {
+        var raw = el('choose-rate').value;
+        var res = OrderLogic.previewChoice(id, activeOfferKey, raw === '' ? '' : Number(raw));
+        var error = el('choose-rate-error');
+        var button = el('confirm-carrier-btn');
+        if (!res.ok || res.rateError) {
+          error.textContent = res.ok ? res.rateError : res.error;
+          el('choose-rate').setAttribute('aria-invalid', 'true');
+          el('choose-margin').textContent = '—';
+          el('choose-margin-percent').textContent = '';
+          el('negative-margin-alert').hidden = true;
+          button.disabled = true;
+          return;
+        }
+        error.textContent = '';
+        el('choose-rate').removeAttribute('aria-invalid');
+        button.disabled = false;
+        var m = res.margin;
+        el('choose-margin').textContent = (m.value > 0 ? '+' : '') + Exp.money(m.value);
+        el('choose-margin-percent').textContent = m.pct.toLocaleString('ru-RU') + '% от ставки клиента';
+        el('choose-margin-box').classList.toggle('margin-box--negative', m.nonPositive);
+        el('negative-margin-alert').hidden = !m.nonPositive;
+        button.textContent = m.nonPositive ? 'Всё равно подтвердить' : 'Подтвердить выбор';
+        button.classList.toggle('btn--primary', !m.nonPositive);
+        button.classList.toggle('btn--danger', m.nonPositive);
+      }
 
-            if (offer) openCarrierPopover(offer, button);
-          });
-        });
-
-        Array.prototype.forEach.call(document.querySelectorAll('[data-rating-popover]'), function (button) {
-          button.addEventListener('click', function () {
-            var offer = DEMO_OFFERS.find(function (o) {
-              return o.id === button.getAttribute('data-rating-popover');
-            });
-
-            if (offer) openRatingPopover(offer, button);
-          });
-        });
-
-        Array.prototype.forEach.call(document.querySelectorAll('[data-choose-offer]'), function (button) {
-          button.addEventListener('click', function () {
-            var offer = DEMO_OFFERS.find(function (o) {
-              return o.id === button.getAttribute('data-choose-offer');
-            });
-
-            if (offer) openChooseModal(offer);
-          });
-        });
+      function openChooseModal(offer) {
+        activeOfferKey = offer.key;
+        el('choose-carrier-name').textContent = offer.name;
+        el('choose-client-rate').textContent = Exp.money(view.order.clientRate);
+        el('choose-rate').value = offer.rate;
+        el('choose-modal').hidden = false;
+        updateMargin();
+        el('choose-rate').focus();
       }
 
       function renderLossReasons() {
-        var wrap = document.getElementById('loss-reasons');
-
-        wrap.innerHTML = DATA.lossReasons.map(function (reason) {
+        el('loss-reasons').innerHTML = view.lossReasons.map(function (reason) {
           return '<label class="radio-card">' +
             '<input type="radio" name="loss-reason" value="' + escape(reason) + '">' +
             '<span>' + escape(reason) + '</span>' +
           '</label>';
         }).join('');
-
-        Array.prototype.forEach.call(wrap.querySelectorAll('input'), function (input) {
-          input.addEventListener('change', function () {
-            document.getElementById('confirm-lost-btn').disabled = false;
-          });
-        });
+        el('confirm-lost-btn').disabled = true;
       }
 
-      function fillOrder() {
-        var route = order.from + ' → ' + order.to;
-
-        Exp.crumbs([['Заявки', 'orders.html'], [route]]);
-        document.getElementById('order-title').textContent = route;
-        document.title = route + ' - Экспедитор';
-
-        document.getElementById('order-from').textContent = order.from;
-        document.getElementById('order-to').textContent = order.to;
-        document.getElementById('order-load-date').textContent = Exp.date(order.loadDate);
-        document.getElementById('order-truck-type').textContent = order.truckType;
-        document.getElementById('order-weight').textContent = order.weightT + ' т';
-        document.getElementById('order-client-rate').textContent = Exp.money(order.clientRate);
-        document.getElementById('order-cargo').textContent = order.cargo || 'нет данных';
-
-        setStatus(order.status);
-        showMatchingState(defaultMatchingState());
-
-        var locked =
-          order.status === 'closed' ||
-          order.status === 'cancelled' ||
-          order.status === 'lost';
-
-        document.getElementById('edit-order-btn').disabled = locked;
-        document.getElementById('cancel-order-btn').disabled = locked;
-        document.getElementById('lost-order-btn').disabled = locked;
+      // Результат действия: сообщение, закрыть окно, перерисовать карточку
+      function afterAction(res, successText) {
+        if (!res.ok) { message(res.error, 'danger'); closeModals(); return; }
+        closeModals();
+        render();
+        message(successText);
       }
 
-      if (!order) {
+      /* ---------- старт ---------- */
+      if (!view) {
         Exp.crumbs([['Заявки', 'orders.html'], ['Заявка не найдена']]);
-        document.getElementById('order-title').textContent = 'Заявка не найдена';
-        document.getElementById('order-status').hidden = true;
+        el('order-title').textContent = 'Заявка не найдена';
+        el('order-status').hidden = true;
         document.querySelector('.order-progress').hidden = true;
         document.querySelector('.card[aria-labelledby="order-info-title"]').hidden = true;
         document.querySelector('.matching-card').hidden = true;
-        document.getElementById('order-actions').hidden = true;
-      } else {
-        fillOrder();
+        el('order-actions').hidden = true;
+        return;
       }
 
-      renderLossReasons();
+      render();
 
-      document.getElementById('choose-rate').addEventListener('input', updateMargin);
+      el('start-match-btn').addEventListener('click', runSearch);
+      el('repeat-match-btn').addEventListener('click', runSearch);
+      el('empty-repeat-btn').addEventListener('click', runSearch);
 
-      document.getElementById('lost-order-btn').addEventListener('click', function () {
-        document.getElementById('lost-modal').hidden = false;
-      });
-
-      document.getElementById('cancel-order-btn').addEventListener('click', function () {
-        document.getElementById('cancel-modal').hidden = false;
-      });
-
-      document.getElementById('start-match-btn').addEventListener('click', function () {
-        showMatchingState('loading');
-      });
-
-      document.getElementById('repeat-match-btn').addEventListener('click', function () {
-        showMatchingState('loading');
-      });
-
-      Array.prototype.forEach.call(document.querySelectorAll('[data-show-state]'), function (button) {
-        button.addEventListener('click', function () {
-          showMatchingState(button.getAttribute('data-show-state'));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-sort]'), function (th) {
+        th.addEventListener('click', function () {
+          var key = th.getAttribute('data-sort');
+          // Ставку удобнее смотреть от дешёвой, рейтинг — от лучшего
+          if (sortState.key === key) sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+          else sortState.dir = key === 'rate' ? 'asc' : 'desc';
+          sortState.key = key;
+          renderOffers();
         });
+      });
+
+      // Кнопки в таблице перерисовываются, поэтому слушаем клики на всей таблице
+      el('offers-body').addEventListener('click', function (event) {
+        var btn = event.target.closest('button');
+        if (!btn) return;
+        var key = btn.getAttribute('data-carrier-popover') || btn.getAttribute('data-rating-popover') || btn.getAttribute('data-choose-offer');
+        var offer = offerByKey(key);
+        if (!offer) return;
+        if (btn.hasAttribute('data-carrier-popover')) openCarrierPopover(offer, btn);
+        else if (btn.hasAttribute('data-rating-popover')) openRatingPopover(offer, btn);
+        else openChooseModal(offer);
+      });
+
+      el('choose-rate').addEventListener('input', updateMargin);
+
+      el('confirm-carrier-btn').addEventListener('click', function () {
+        var rate = Number(el('choose-rate').value);
+        var res = OrderLogic.chooseCarrier(id, activeOfferKey, { rate: rate, confirmLoss: true });
+        afterAction(res, res.ok ? 'Перевозчик выбран: ' + res.order.carrierName + ', ставка ' + Exp.money(res.order.carrierRate) : '');
+      });
+
+      el('lost-order-btn').addEventListener('click', function () {
+        renderLossReasons();
+        el('lost-modal').hidden = false;
+      });
+
+      el('loss-reasons').addEventListener('change', function () {
+        el('confirm-lost-btn').disabled = false;
+      });
+
+      el('confirm-lost-btn').addEventListener('click', function () {
+        var checked = document.querySelector('input[name="loss-reason"]:checked');
+        afterAction(OrderLogic.markLost(id, checked ? checked.value : ''), 'Заявка отмечена потерянной');
+      });
+
+      el('cancel-order-btn').addEventListener('click', function () {
+        el('cancel-modal').hidden = false;
+      });
+
+      el('confirm-cancel-btn').addEventListener('click', function () {
+        afterAction(OrderLogic.cancel(id), 'Заявка отменена');
+      });
+
+      el('close-order-btn').addEventListener('click', function () {
+        afterAction(OrderLogic.close(id), 'Заявка закрыта');
+      });
+
+      el('edit-order-btn').addEventListener('click', function () {
+        message('Редактирование заявки появится в следующей версии', 'warning');
       });
 
       Array.prototype.forEach.call(document.querySelectorAll('[data-modal-close]'), function (button) {
@@ -1119,11 +1037,9 @@
       });
 
       document.addEventListener('click', function (event) {
-        if (
-          !event.target.closest('.popover') &&
-          !event.target.closest('[data-carrier-popover]') &&
-          !event.target.closest('[data-rating-popover]')
-        ) {
+        if (!event.target.closest('.popover') &&
+            !event.target.closest('[data-carrier-popover]') &&
+            !event.target.closest('[data-rating-popover]')) {
           closePopovers();
         }
       });
