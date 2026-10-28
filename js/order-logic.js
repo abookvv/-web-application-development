@@ -299,6 +299,16 @@
     if (!m) return { ok: false, error: 'Нельзя закрыть заявку без ставки перевозчика' };
     o.status = 'closed';
     Exp.save('orders', g.orders);
+    // ФТ-45: у перевозчика из своей базы прибавляется рейс и обновляется дата последнего рейса
+    if (o.carrierId) {
+      var carriers = Exp.load('carriers');
+      var c = carriers.filter(function (x) { return x.id === o.carrierId; })[0];
+      if (c) {
+        c.trips = (Number(c.trips) || 0) + 1;
+        if (!c.lastTrip || o.loadDate > c.lastTrip) c.lastTrip = o.loadDate;
+        Exp.save('carriers', carriers);
+      }
+    }
     addJournal(o.id, Exp.user.login, 'Закрыл заявку', 'маржа: ' + Exp.money(m.value));
     changed(o);
     return { ok: true, order: o };

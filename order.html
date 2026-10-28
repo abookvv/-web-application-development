@@ -661,7 +661,7 @@
         var box = el('card-message');
         if (!text) { box.hidden = true; return; }
         box.className = 'alert alert--' + (kind || 'success');
-        box.innerHTML = '<span class="alert__icon">' + (kind === 'danger' ? '!' : '✓') + '</span><div>' + escape(text) + '</div>';
+        box.innerHTML = '<span class="alert__icon">' + (kind === 'danger' || kind === 'warning' ? '!' : '✓') + '</span><div>' + escape(text) + '</div>';
         box.hidden = false;
       }
 
@@ -937,9 +937,12 @@
       }
 
       /* ---------- старт ---------- */
-      if (!view) {
-        Exp.crumbs([['Заявки', 'orders.html'], ['Заявка не найдена']]);
-        el('order-title').textContent = 'Заявка не найдена';
+      // НФТ-09: логист видит только свои заявки, в том числе по прямой ссылке
+      var denied = view && Exp.user.role === 'logist' && view.order.logist !== Exp.user.login;
+      if (!view || denied) {
+        Exp.crumbs([['Заявки', 'orders.html'], [denied ? 'Нет доступа' : 'Заявка не найдена']]);
+        el('order-title').textContent = denied ? 'Нет доступа к заявке' : 'Заявка не найдена';
+        message(denied ? 'Эта заявка другого логиста. Её может открыть руководитель отдела.' : 'Проверьте номер заявки или вернитесь к списку заявок.', 'warning');
         el('order-status').hidden = true;
         document.querySelector('.order-progress').hidden = true;
         document.querySelector('.card[aria-labelledby="order-info-title"]').hidden = true;
