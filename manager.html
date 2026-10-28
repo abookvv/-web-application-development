@@ -324,6 +324,10 @@
         document.getElementById('period-sub').textContent = period.title + ': ' + rangeLabel(b.from, b.to) + ' · заявки всех логистов компании';
         document.getElementById('range-from').value = b.from;
         document.getElementById('range-to').value = b.to;
+        // Поля снова показывают действующий период, поэтому старая ошибка дат больше не относится к ним
+        document.getElementById('range-error').textContent = '';
+        document.getElementById('range-from').removeAttribute('aria-invalid');
+        document.getElementById('range-to').removeAttribute('aria-invalid');
         Array.prototype.forEach.call(document.querySelectorAll('.mgr-period__btn'), function (btn) {
           btn.setAttribute('aria-pressed', String(btn.getAttribute('data-period') === state.period));
         });
