@@ -150,7 +150,6 @@
 
   <main class="page">
     <div class="page-head">
-      <nav id="crumbs"></nav>
       <h1>Администрирование</h1>
     </div>
 
@@ -320,14 +319,19 @@
     var user = Exp.user;
     if (!user) return;
 
-    // Используем Exp.crumbs из app.js
-    if (Exp.crumbs) {
-      Exp.crumbs([['Администрирование']]);
-    }
 
     var $ = function (s, r) { return (r || document).querySelector(s); };
     var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
     var esc = Exp.escapeHtml;
+
+    // Временный пароль вида K7m-29xq-Lp: новый при каждом создании сотрудника
+    function tempPassword() {
+      var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+      var bytes = new Uint8Array(10);
+      crypto.getRandomValues(bytes);
+      var out = Array.prototype.map.call(bytes, function (b) { return chars[b % chars.length]; }).join('');
+      return out.slice(0, 3) + '-' + out.slice(3, 7) + '-' + out.slice(7);
+    }
 
     var IMPORTS_KEY = 'exp_admin_imports';
     var JOURNAL_KEY = 'exp_admin_journal';
@@ -893,8 +897,10 @@
           if (!r) { rF.classList.add('is-error'); ok = false; }
           if (!ok) return;
 
-          var pass = 'K7m-29xq-Lp';
-          users.push({ login: l, password: pass, name: n, short: n.split(' ')[0], role: r, active: true });
+          var pass = tempPassword();
+          // ФИО вводят как «Фамилия Имя Отчество», в шапке показываем имя
+          var nameParts = n.split(' ');
+          users.push({ login: l, password: pass, name: n, short: nameParts[1] || nameParts[0], role: r, active: true });
           saveUsers();
 
           journalExtra.unshift({

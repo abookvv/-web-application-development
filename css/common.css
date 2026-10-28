@@ -369,11 +369,12 @@ textarea.field__control {
   white-space: nowrap;
 }
 
-.status-chip--new { background: #f0f1f5; color: #5f6678; }
+/* У каждого статуса свой цвет: «Новая» — голубая, «Отменена» — без заливки, только контур */
+.status-chip--new { background: #e6f0fc; color: #1f5fa8; }
 .status-chip--in-work { background: var(--primary-soft); color: var(--primary); }
 .status-chip--carrier { background: var(--accent-soft); color: #9a5b00; }
 .status-chip--closed { background: var(--success-soft); color: #20794c; }
-.status-chip--cancelled { background: #f1f2f5; color: #707789; }
+.status-chip--cancelled { background: var(--white); color: #707789; box-shadow: inset 0 0 0 1px #c9ccd6; }
 .status-chip--lost { background: var(--danger-soft); color: #b93844; }
 
 /* ---------- Вкладки ---------- */

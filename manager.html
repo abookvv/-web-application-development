@@ -99,7 +99,14 @@
       .mgr-period { width: 100%; }
       .mgr-period__btn { flex: 1 1 0; }
       .mgr-panel { padding: 16px; }
+      .mgr-range { width: 100%; }
     }
+    .mgr-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    .mgr-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--mute); }
+    .mgr-range input { height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--white); color: var(--ink); }
+    .mgr-range input[aria-invalid="true"] { border-color: var(--danger); }
+    .mgr-range__error { width: 100%; text-align: right; color: var(--danger); font-size: 12px; }
+    .mgr-range__error:empty { display: none; }
   </style>
 </head>
 <body data-page="manager" data-roles="manager">
@@ -111,10 +118,20 @@
         <h1>Панель отдела</h1>
         <p class="mgr-sub" id="period-sub"></p>
       </div>
-      <div class="mgr-period" role="group" aria-label="Период">
-        <button class="mgr-period__btn" type="button" data-period="day" aria-pressed="false">День</button>
-        <button class="mgr-period__btn" type="button" data-period="week" aria-pressed="true">Неделя</button>
-        <button class="mgr-period__btn" type="button" data-period="month" aria-pressed="false">Месяц</button>
+      <div class="mgr-controls">
+        <div class="mgr-period" role="group" aria-label="Период">
+          <button class="mgr-period__btn" type="button" data-period="day" aria-pressed="false">День</button>
+          <button class="mgr-period__btn" type="button" data-period="week" aria-pressed="true">Неделя</button>
+          <button class="mgr-period__btn" type="button" data-period="month" aria-pressed="false">Месяц</button>
+        </div>
+        <!-- Произвольный период: квартал, год и т. п. (замечание преподавателя) -->
+        <div class="mgr-range" role="group" aria-label="Произвольный период">
+          <label for="range-from">с</label>
+          <input type="date" id="range-from">
+          <label for="range-to">по</label>
+          <input type="date" id="range-to">
+          <span class="mgr-range__error" id="range-error" role="alert"></span>
+        </div>
       </div>
     </div>
 
@@ -182,10 +199,11 @@
       var PERIODS = {
         day: { days: 1, title: 'День', sub: 'за день', empty: 'За выбранный день заявок нет. Выберите «Неделя» или «Месяц».' },
         week: { days: 7, title: 'Неделя', sub: 'за неделю', empty: 'За выбранную неделю заявок нет. Выберите «День» или «Месяц».' },
-        month: { days: 30, title: 'Месяц', sub: 'за месяц', empty: 'За выбранный месяц заявок нет. Выберите «День» или «Неделя».' }
+        month: { days: 30, title: 'Месяц', sub: 'за месяц', empty: 'За выбранный месяц заявок нет. Выберите «День» или «Неделя».' },
+        custom: { title: 'Период', sub: 'за период', empty: 'За выбранный период заявок нет. Измените даты.' }
       };
       var esc = Exp.escapeHtml;
-      var state = { period: 'week', reason: null };
+      var state = { period: 'week', reason: null, from: null, to: null };
       var lastFocus = null;
 
       function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -233,12 +251,17 @@
         var user = Exp.findUser(login);
         return user ? user.name : login;
       }
-      function ordersOfPeriod(orders, period) {
-        var from = addDays(TODAY, -(PERIODS[period].days - 1));
+      // Границы периода: у «День / Неделя / Месяц» — от TODAY назад, у произвольного — из полей «с» и «по»
+      function bounds() {
+        if (state.period === 'custom') return { from: state.from, to: state.to };
+        return { from: addDays(TODAY, -(PERIODS[state.period].days - 1)), to: TODAY };
+      }
+      function ordersOfPeriod(orders) {
+        var b = bounds();
         return orders.filter(function (o) {
           var day = o.createdAt.slice(0, 10);
           if (day > TODAY) day = TODAY;
-          return day >= from;
+          return day >= b.from && day <= b.to;
         });
       }
 
@@ -290,15 +313,17 @@
       function render() {
         var period = PERIODS[state.period];
         var users = Exp.load('users');
-        var list = ordersOfPeriod(Exp.load('orders'), state.period);
+        var list = ordersOfPeriod(Exp.load('orders'));
         var empty = list.length === 0;
         var lost = list.filter(function (o) { return o.status === 'lost'; });
         var counts = DATA.lossReasons.map(function (reason) {
           return lost.filter(function (o) { return o.lossReason === reason; }).length;
         });
 
-        var from = addDays(TODAY, -(period.days - 1));
-        document.getElementById('period-sub').textContent = period.title + ': ' + rangeLabel(from, TODAY) + ' · заявки всех логистов компании';
+        var b = bounds();
+        document.getElementById('period-sub').textContent = period.title + ': ' + rangeLabel(b.from, b.to) + ' · заявки всех логистов компании';
+        document.getElementById('range-from').value = b.from;
+        document.getElementById('range-to').value = b.to;
         Array.prototype.forEach.call(document.querySelectorAll('.mgr-period__btn'), function (btn) {
           btn.setAttribute('aria-pressed', String(btn.getAttribute('data-period') === state.period));
         });
@@ -403,9 +428,35 @@
         btn.addEventListener('click', function () {
           state.period = btn.getAttribute('data-period');
           state.reason = null;
+          document.getElementById('range-error').textContent = '';
+          document.getElementById('range-from').removeAttribute('aria-invalid');
+          document.getElementById('range-to').removeAttribute('aria-invalid');
           render();
         });
       });
+
+      // Произвольный период: считаем, как только обе даты заданы и «с» не позже «по»
+      function onRangeChange() {
+        var fromEl = document.getElementById('range-from');
+        var toEl = document.getElementById('range-to');
+        var error = document.getElementById('range-error');
+        var from = fromEl.value, to = toEl.value;
+        var bad = !from || !to || from > to;
+        fromEl.setAttribute('aria-invalid', String(bad && (!from || from > to)));
+        toEl.setAttribute('aria-invalid', String(bad && (!to || from > to)));
+        if (bad) {
+          error.textContent = !from || !to ? 'Укажите обе даты' : 'Дата «с» не может быть позже даты «по»';
+          return;
+        }
+        error.textContent = '';
+        state.period = 'custom';
+        state.from = from;
+        state.to = to;
+        state.reason = null;
+        render();
+      }
+      document.getElementById('range-from').addEventListener('change', onRangeChange);
+      document.getElementById('range-to').addEventListener('change', onRangeChange);
 
       document.getElementById('losses-body').addEventListener('click', function (event) {
         var btn = event.target.closest('[data-reason]');

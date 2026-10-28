@@ -32,7 +32,7 @@
     .orders-table tbody tr:focus-visible { outline-offset: -2px; }
     .route { font-weight: 600; }
     .cell-secondary { display: block; margin-top: 2px; color: var(--mute); font-size: 12px; }
-    .status { display: inline-flex; padding: 4px 8px; border-radius: 12px; background: var(--soft); white-space: nowrap; font-size: 12px; }
+    .logist-filter { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--mute); font-size: 13px; }
     .empty-state { padding: 64px 24px; text-align: center; }
     .empty-state h2 { margin-bottom: 6px; }
     .empty-state p { margin: 0; color: var(--mute); }
@@ -57,6 +57,11 @@
       <button class="tab" id="tab-closed" type="button" role="tab" aria-selected="false" data-tab="closed">Закрытые <span class="tab__count" data-count="closed">0</span></button>
       <button class="tab" id="tab-lost" type="button" role="tab" aria-selected="false" data-tab="lost">Отменённые и потерянные <span class="tab__count" data-count="lost">0</span></button>
     </div>
+
+    <p class="logist-filter" id="logist-filter" hidden>
+      <span id="logist-filter-text"></span>
+      <a href="orders.html">Показать заявки всех логистов</a>
+    </p>
 
     <div class="orders-tools">
       <label class="search-field">
@@ -91,7 +96,21 @@
     (function () {
       var activeTab = 'work';
       var allOrders = Exp.load('orders');
-      var orders = Exp.user.role === 'manager' ? allOrders : allOrders.filter(function (order) { return order.logist === Exp.user.login; });
+      var isManager = Exp.user.role === 'manager';
+      // Переход с панели руководителя: orders.html?logist=alexey — заявки одного логиста
+      var logistParam = isManager ? new URLSearchParams(location.search).get('logist') : null;
+      var logistUser = logistParam ? Exp.findUser(logistParam) : null;
+      var orders = isManager
+        ? allOrders.filter(function (order) { return !logistUser || order.logist === logistUser.login; })
+        : allOrders.filter(function (order) { return order.logist === Exp.user.login; });
+      var statusClass = {
+        new: 'status-chip--new', in_work: 'status-chip--in-work', carrier_chosen: 'status-chip--carrier',
+        closed: 'status-chip--closed', cancelled: 'status-chip--cancelled', lost: 'status-chip--lost'
+      };
+      if (logistUser) {
+        document.getElementById('logist-filter-text').textContent = 'Заявки логиста: ' + logistUser.name;
+        document.getElementById('logist-filter').hidden = false;
+      }
       var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
       var searchInput = document.getElementById('route-search');
       var truckFilter = document.getElementById('truck-filter');
@@ -135,10 +154,19 @@
       function rowHtml(order) {
         return '<tr tabindex="0" data-id="' + order.id + '" aria-label="Открыть заявку №' + order.id + '">' +
           '<td>' + order.id + '</td>' +
-          '<td><span class="route">' + Exp.escapeHtml(order.from) + ' → ' + Exp.escapeHtml(order.to) + '</span><span class="cell-secondary">Создана ' + Exp.date(order.createdAt) + '</span></td>' +
+          '<td><span class="route">' + Exp.escapeHtml(order.from) + ' → ' + Exp.escapeHtml(order.to) + '</span><span class="cell-secondary">Создана ' + Exp.date(order.createdAt) + logistNote(order) + '</span></td>' +
           '<td>' + Exp.escapeHtml(order.truckType) + '<span class="cell-secondary">' + order.weightT + ' т</span></td>' +
           '<td>' + Exp.date(order.loadDate) + '</td><td>' + Exp.money(order.clientRate) + '</td>' +
-          '<td><span class="status">' + Exp.escapeHtml(DATA.statuses[order.status]) + '</span></td><td aria-hidden="true">→</td></tr>';
+          '<td><span class="status-chip ' + (statusClass[order.status] || '') + '">' + Exp.escapeHtml(DATA.statuses[order.status]) + '</span>' +
+          (order.status === 'lost' && order.lossReason ? '<span class="cell-secondary">' + Exp.escapeHtml(order.lossReason) + '</span>' : '') +
+          '</td><td aria-hidden="true">→</td></tr>';
+      }
+
+      // Руководитель видит заявки всех логистов — подписываем, чья заявка
+      function logistNote(order) {
+        if (!isManager || logistUser) return '';
+        var user = Exp.findUser(order.logist);
+        return ' · ' + Exp.escapeHtml(user ? user.name : order.logist);
       }
 
       function render() {
